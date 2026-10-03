@@ -212,5 +212,10 @@ input:focus-visible, select:focus-visible, button:focus-visible { outline: 2px s
 .info-impresora dt { color: var(--texto-2); }
 .info-impresora dd { margin: 0; font-weight: 600; overflow-wrap: anywhere; }
 
+.diag-salida {
+  margin: 0; padding: 12px; background: var(--superficie-2); border-radius: 10px; font-size: 0.8rem;
+  white-space: pre-wrap; overflow-wrap: anywhere; max-height: 50vh; overflow: auto;
+}
+
 /* ---------- ejemplos en ajustes ---------- */
 .ejemplos { display: flex; gap: 20px; justify-content: center; align-items: start; }
