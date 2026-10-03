@@ -14,8 +14,19 @@ import {
   reemplazarPerfumes,
 } from "./almacen";
 import { descargarTexto, perfumesACsv, perfumesDesdeCsv } from "./csv";
+import { diagnosticarBle, diagnosticarSerie } from "./diagnostico";
+import {
+  GUIA_PREVIA_MM,
+  areaImprimibleU1,
+  calcularCalibracionU1,
+  lienzoEtiquetaU1,
+  lienzoGuiaU1,
+  lienzoPruebaU1,
+  lienzoReglaU1,
+  u1,
+} from "./u1";
 import { CANAL, PREFIJO } from "./entorno";
-import { esCorta, lienzoImpresion, renderizarEtiqueta } from "./etiqueta";
+import { esCorta, lienzoImpresion, renderizarEtiqueta, renderizarEtiquetaHorizontal } from "./etiqueta";
 import {
   impresora,
   PAUSAS_ENVIO,
@@ -24,7 +35,14 @@ import {
   type InfoImpresora,
   type TiemposImpresion,
 } from "./impresora";
-import { cargarLogosIncluidos, procesarLogoSubido, slugMarca, urlLogoMarca, urlLogoTienda } from "./marcas";
+import {
+  cargarImagen,
+  cargarLogosIncluidos,
+  procesarLogoSubido,
+  slugMarca,
+  urlLogoMarca,
+  urlLogoTienda,
+} from "./marcas";
 import { GENEROS, type DatosEtiqueta, type Genero, type Perfume } from "./tipos";
 
 // ---------- utilidades ----------
@@ -78,6 +96,46 @@ function leerArchivo(acepta: string): Promise<File | null> {
   });
 }
 
+// ---------- dos impresoras ----------
+
+/** Chica = Niimbot D11 (etiqueta vertical 12 × 40). Grande = Yihetangde U1 (horizontal 40 × 20). */
+type Modo = "chica" | "grande";
+
+function esGrande(volumen: string): boolean {
+  return estado.ajustes.volumenesGrandes.map(String).includes(volumen.trim());
+}
+
+function volumenesDe(modo: Modo): string[] {
+  const grandes = estado.ajustes.volumenesGrandes.map(String);
+  const todos = [...new Set([...estado.ajustes.volumenes.map(String), ...grandes])];
+  return modo === "grande" ? grandes : todos.filter((v) => !grandes.includes(v));
+}
+
+let modo: Modo = "chica";
+try {
+  if (localStorage.getItem(`${PREFIJO}modo`) === "grande") modo = "grande";
+} catch {
+  /* sin almacenamiento */
+}
+function elegirModo(m: Modo): void {
+  modo = m;
+  try {
+    localStorage.setItem(`${PREFIJO}modo`, m);
+  } catch {
+    /* sin almacenamiento */
+  }
+}
+
+/** Etiqueta de la impresora grande: diseño horizontal + su ubicación en los 384 puntos del cabezal. */
+async function etiquetaGrande(datos: DatosEtiqueta): Promise<{ etiqueta: HTMLCanvasElement; lienzo: HTMLCanvasElement }> {
+  const o = estado.ajustes.u1;
+  const area = areaImprimibleU1(o.anchoMm, o.desplazamiento);
+  // El margen de arriba se resta del alto: la imagen total sigue midiendo lo mismo que la etiqueta.
+  const margen = Math.round(Math.max(0, o.margenArribaMm) * 8);
+  const etiqueta = await renderizarEtiquetaHorizontal(datos, estado.ajustes, area.ancho, Math.round(o.altoMm * 8) - margen);
+  return { etiqueta, lienzo: lienzoEtiquetaU1(etiqueta, area.x, margen) };
+}
+
 /** Dibuja la etiqueta en un canvas visible (vista previa). Evita carreras entre renders. */
 const versionesPrevia = new WeakMap<HTMLCanvasElement, number>();
 async function pintarVistaPrevia(
@@ -87,8 +145,12 @@ async function pintarVistaPrevia(
 ): Promise<HTMLCanvasElement> {
   const v = (versionesPrevia.get(destino) ?? 0) + 1;
   versionesPrevia.set(destino, v);
-  const etiqueta = await renderizarEtiqueta(datos, estado.ajustes, pareja);
+  const grande = esGrande(datos.volumen);
+  const etiqueta = grande ? (await etiquetaGrande(datos)).etiqueta : await renderizarEtiqueta(datos, estado.ajustes, pareja);
   if (versionesPrevia.get(destino) === v) {
+    destino.parentElement?.classList.toggle("horizontal", grande);
+    const pie = destino.closest("figure")?.querySelector("figcaption");
+    if (pie) pie.textContent = grande ? "40 × 20 mm · impresora grande" : "12 × 40 mm · impresora chica";
     destino.width = etiqueta.width;
     destino.height = etiqueta.height;
     destino.getContext("2d")!.drawImage(etiqueta, 0, 0);
@@ -97,7 +159,9 @@ async function pintarVistaPrevia(
 }
 
 async function descargarPng(datos: DatosEtiqueta, pareja?: DatosEtiqueta | null): Promise<void> {
-  const etiqueta = await renderizarEtiqueta(datos, estado.ajustes, pareja);
+  const etiqueta = esGrande(datos.volumen)
+    ? (await etiquetaGrande(datos)).etiqueta
+    : await renderizarEtiqueta(datos, estado.ajustes, pareja);
   const a = document.createElement("a");
   a.href = etiqueta.toDataURL("image/png");
   a.download = `etiqueta-${slugMarca(datos.nombre) || "decant"}-${slugMarca(datos.volumen)}.png`;
@@ -109,11 +173,32 @@ async function descargarPng(datos: DatosEtiqueta, pareja?: DatosEtiqueta | null)
 const btnImpresora = $("#btn-impresora");
 impresora.alCambiar((est, detalle) => {
   btnImpresora.dataset.estado = est;
+  btnImpresora.title = `Impresora chica (3, 5 y 10 ml)${detalle ? ` · ${detalle}` : ""}`;
   $("#txt-impresora").textContent =
-    est === "conectada" ? detalle || "Conectada"
-    : est === "conectando" ? "Conectando…"
-    : est === "imprimiendo" ? "Imprimiendo…"
-    : "Conectar impresora";
+    est === "conectando" ? "Chica…" : est === "imprimiendo" ? "Imprimiendo…" : "Chica";
+});
+
+const btnImpresoraU1 = $("#btn-impresora-u1");
+const estadoU1 = (conectada: boolean, texto = "Grande") => {
+  btnImpresoraU1.dataset.estado = conectada ? "conectada" : "desconectada";
+  $("#txt-impresora-u1").textContent = texto;
+};
+u1.alCambiarEstado = (conectada) => estadoU1(conectada);
+btnImpresoraU1.addEventListener("click", async () => {
+  try {
+    if (u1.conectada) {
+      if (confirm("¿Desconectar la impresora grande?")) await u1.desconectar();
+      estadoU1(u1.conectada);
+    } else {
+      btnImpresoraU1.dataset.estado = "conectando";
+      $("#txt-impresora-u1").textContent = "Grande…";
+      await u1.conectar();
+      aviso("Impresora grande conectada");
+    }
+  } catch (e) {
+    estadoU1(u1.conectada);
+    aviso(mensajeError(e), "error");
+  }
 });
 /**
  * Usa la resolución que informa la impresora conectada (D11: 203 DPI, D11-H: 300 DPI…),
@@ -150,6 +235,7 @@ async function imprimir(
   progreso?: (t: string) => void,
   pareja?: DatosEtiqueta | null,
 ): Promise<boolean> {
+  if (esGrande(datos.volumen)) return imprimirGrande(datos, cantidad, progreso);
   let tiempos: TiemposImpresion;
   try {
     // Conectar primero: Chrome solo abre el selector Bluetooth justo después de un toque.
@@ -177,6 +263,24 @@ async function imprimir(
   const de = pareja ? `${datos.nombre} + ${pareja.nombre} (2 en 1)` : datos.nombre;
   const s = (ms: number) => (ms / 1000).toLocaleString("es", { maximumFractionDigits: 1 });
   aviso(`Listo: ${cantidad} etiqueta${cantidad === 1 ? "" : "s"} de ${de} · ${s(tiempos.total)} s (envío ${s(tiempos.envio)} s)`);
+  return true;
+}
+
+/** Impresión en la impresora grande (U1). */
+async function imprimirGrande(datos: DatosEtiqueta, cantidad: number, progreso?: (t: string) => void): Promise<boolean> {
+  const inicio = performance.now();
+  try {
+    const { lienzo } = await etiquetaGrande(datos);
+    btnImpresoraU1.dataset.estado = "imprimiendo";
+    await u1.imprimir(lienzo, cantidad, estado.ajustes.u1, progreso);
+  } catch (e) {
+    aviso("No se pudo imprimir en la impresora grande: " + mensajeError(e), "error");
+    return false;
+  } finally {
+    estadoU1(u1.conectada);
+  }
+  const s = ((performance.now() - inicio) / 1000).toLocaleString("es", { maximumFractionDigits: 1 });
+  aviso(`Listo: ${cantidad} etiqueta${cantidad === 1 ? "" : "s"} grande${cantidad === 1 ? "" : "s"} de ${datos.nombre} · ${s} s`);
   return true;
 }
 
@@ -220,7 +324,16 @@ function perfumesFiltrados(): Perfume[] {
 
 function vistaCatalogo(): void {
   const marcas = marcasDelCatalogo();
+  const textoVolumenes = (m: Modo) => volumenesDe(m).join(" · ") + " ml";
   $("#vista").innerHTML = `
+    <section class="modos" aria-label="¿Qué etiqueta vas a imprimir?">
+      <button type="button" class="modo ${modo === "chica" ? "activa" : ""}" data-modo="chica">
+        <b>Etiquetas chicas</b><span>${esc(textoVolumenes("chica"))}</span>
+      </button>
+      <button type="button" class="modo ${modo === "grande" ? "activa" : ""}" data-modo="grande">
+        <b>Etiquetas grandes</b><span>${esc(textoVolumenes("grande"))}</span>
+      </button>
+    </section>
     <section class="filtros">
       <input type="search" id="f-buscar" placeholder="Buscar perfume, marca o nota…" value="${esc(filtro.texto)}" />
       <select id="f-marca">
@@ -272,6 +385,12 @@ function vistaCatalogo(): void {
       pintarLista();
     }),
   );
+  $$(".modo").forEach((b) =>
+    b.addEventListener("click", () => {
+      elegirModo(b.dataset.modo as Modo);
+      $$(".modo").forEach((x) => x.classList.toggle("activa", x === b));
+    }),
+  );
   $("#btn-nuevo").addEventListener("click", () => abrirEditor(null));
   $("#lista").addEventListener("click", (e) => {
     const fila = (e.target as HTMLElement).closest<HTMLElement>(".fila");
@@ -309,8 +428,9 @@ function opcionesPerfumes(): string {
 
 function abrirImpresion(p: Perfume): void {
   const dlg = $<HTMLDialogElement>("#dlg-imprimir");
-  const vols = estado.ajustes.volumenes.map(String);
+  const vols = volumenesDe(modo);
   let volumen = vols.includes(ultimoVolumen) ? ultimoVolumen : (vols[0] ?? "5");
+  const nombreImpresora = modo === "grande" ? "impresora grande" : "impresora chica";
 
   dlg.innerHTML = `
     <form method="dialog" class="dialogo-contenido">
@@ -321,19 +441,28 @@ function abrirImpresion(p: Perfume): void {
       <div class="imprimir-cuerpo">
         <figure class="vista-previa"><div class="papel"><canvas id="i-previa"></canvas></div><figcaption>12 × 40 mm</figcaption></figure>
         <div class="controles">
-          <label class="etiqueta-campo">Volumen</label>
+          <label class="etiqueta-campo">Volumen <small>(${nombreImpresora})</small></label>
           <div class="segmentado volumenes" id="i-vol">
             ${vols.map((v) => `<button type="button" data-v="${v}">${v} ml</button>`).join("")}
           </div>
           <div class="par" id="i-par" hidden>
-            <label class="check"><input type="checkbox" id="i-dos" ${ultimoDosEnUno ? "checked" : ""} /> 2 en 1: dos etiquetas cortas en una</label>
-            <label class="par-segunda" id="i-segunda-campo">Segunda etiqueta
+            <div class="par-opciones" role="radiogroup" aria-label="¿Cuántas etiquetas de 3 ml en una?">
+              <button type="button" class="par-opcion" data-par="1" role="radio">
+                <span class="par-dibujo"><i></i></span>
+                <b>1 etiqueta</b><small>una sola</small>
+              </button>
+              <button type="button" class="par-opcion" data-par="2" role="radio">
+                <span class="par-dibujo"><i></i><i></i></span>
+                <b>2 en 1</b><small>ahorra papel</small>
+              </button>
+            </div>
+            <label class="par-segunda" id="i-segunda-campo">¿Qué perfume va abajo?
               <select id="i-segunda">
                 <option value="">El mismo perfume</option>
                 ${opcionesPerfumes()}
               </select>
+              <span class="par-tijera">✂ Córtala por la línea punteada</span>
             </label>
-            <small class="ayuda">Se imprimen una debajo de la otra, con una línea punteada para cortar.</small>
           </div>
           <label class="etiqueta-campo" for="i-cant">Cantidad de etiquetas</label>
           <div class="stepper">
@@ -341,9 +470,10 @@ function abrirImpresion(p: Perfume): void {
             <input id="i-cant" type="number" min="1" max="99" value="1" inputmode="numeric" />
             <button type="button" data-paso="1" aria-label="Más">+</button>
           </div>
-          <button type="button" class="btn primario grande" id="i-imprimir">Imprimir</button>
+          <button type="button" class="btn primario grande" id="i-imprimir">Imprimir en la ${nombreImpresora}</button>
           <p class="progreso" id="i-progreso"></p>
           <div class="acciones-sec">
+            ${modo === "grande" ? `<button type="button" class="btn" id="i-alinear" title="Avanza hasta el inicio de la siguiente etiqueta. Úsalo después de poner el rollo o encender la impresora.">Calibrar papel</button>` : ""}
             <button type="button" class="btn" id="i-editar">Editar perfume</button>
             <button type="button" class="btn" id="i-png">Descargar PNG</button>
           </div>
@@ -354,18 +484,23 @@ function abrirImpresion(p: Perfume): void {
   const datos = (): DatosEtiqueta => ({ nombre: p.nombre, marca: p.marca, volumen });
   const canvas = $<HTMLCanvasElement>("#i-previa", dlg);
   const cant = $<HTMLInputElement>("#i-cant", dlg);
-  const dos = $<HTMLInputElement>("#i-dos", dlg);
+  let dosEnUno = ultimoDosEnUno;
   const segunda = $<HTMLSelectElement>("#i-segunda", dlg);
   /** Segunda etiqueta del "2 en 1" (null si no aplica). */
   const pareja = (): DatosEtiqueta | null => {
-    if (!esCorta(volumen, estado.ajustes) || !dos.checked) return null;
+    if (!esCorta(volumen, estado.ajustes) || !dosEnUno) return null;
     const otro = estado.perfumes.find((x) => x.id === segunda.value) ?? p;
     return { nombre: otro.nombre, marca: otro.marca, volumen };
   };
   const actualizar = () => {
     $$("#i-vol button", dlg).forEach((b) => b.classList.toggle("activa", b.dataset.v === volumen));
     $("#i-par", dlg).hidden = !esCorta(volumen, estado.ajustes);
-    $("#i-segunda-campo", dlg).hidden = !dos.checked;
+    $("#i-segunda-campo", dlg).hidden = !dosEnUno;
+    $$(".par-opcion", dlg).forEach((b) => {
+      const activa = (b.dataset.par === "2") === dosEnUno;
+      b.classList.toggle("activa", activa);
+      b.setAttribute("aria-checked", String(activa));
+    });
     void pintarVistaPrevia(canvas, datos(), pareja());
   };
   actualizar();
@@ -376,16 +511,31 @@ function abrirImpresion(p: Perfume): void {
       actualizar();
     }),
   );
-  dos.addEventListener("change", () => {
-    ultimoDosEnUno = dos.checked;
-    actualizar();
-  });
+  $$(".par-opcion", dlg).forEach((b) =>
+    b.addEventListener("click", () => {
+      dosEnUno = ultimoDosEnUno = b.dataset.par === "2";
+      actualizar();
+    }),
+  );
   segunda.addEventListener("change", actualizar);
   $$(".stepper button", dlg).forEach((b) =>
     b.addEventListener("click", () => {
       cant.value = String(Math.min(99, Math.max(1, (parseInt(cant.value, 10) || 1) + Number(b.dataset.paso))));
     }),
   );
+  document.getElementById("i-alinear")?.addEventListener("click", async (e) => {
+    const btn = e.currentTarget as HTMLButtonElement;
+    if (!confirm("Esto avanza hasta el inicio de la siguiente etiqueta (la que esté a medias se pierde). Úsalo después de poner el rollo o encender la impresora. ¿Continuar?")) return;
+    btn.disabled = true;
+    try {
+      await u1.avanzarAlHueco(estado.ajustes.u1);
+      aviso("Papel calibrado: la siguiente etiqueta saldrá completa");
+    } catch (err) {
+      aviso(mensajeError(err), "error");
+    } finally {
+      btn.disabled = false;
+    }
+  });
   $("#i-editar", dlg).addEventListener("click", () => {
     dlg.close();
     abrirEditor(p);
@@ -511,6 +661,252 @@ function vistaRapida(): void {
   });
 }
 
+// ---------- impresora U1 (pruebas) ----------
+
+function seccionU1(): string {
+  const o = estado.ajustes.u1;
+  const opc = (valores: (string | number)[], actual: string | number, nombre = (v: string | number) => String(v)) =>
+    valores
+      .map((v) => `<option value="${v}" ${String(v) === String(actual) ? "selected" : ""}>${esc(nombre(v))}</option>`)
+      .join("");
+  const avances: Record<string, string> = {
+    hueco: "Buscar el hueco (sensor)",
+    fijo: "Fijo (mm)",
+    timini: "Como TiMini (12 mm)",
+  };
+  return `<details class="tarjeta formulario" id="sec-u1">
+      <summary><h2>Impresora grande (U1) <small>· calibración y pruebas</small></h2></summary>
+      <p class="ayuda">Imprime una etiqueta de calibración: un marco justo en el borde de la etiqueta y una flecha
+        "ARRIBA". Sirve para ajustar el centrado y cómo avanza hasta la siguiente etiqueta.</p>
+      <div class="acciones-sec envolver">
+        <button type="button" class="btn" id="u1-conectar">${u1.conectada ? `Conectada: ${esc(u1.nombre)}` : "Conectar U1"}</button>
+        <button type="button" class="btn primario" id="u1-imprimir">Imprimir prueba</button>
+        <button type="button" class="btn" id="u1-regla">Imprimir regla</button>
+        <button type="button" class="btn" id="u1-avanzar">Avanzar a la siguiente etiqueta</button>
+      </div>
+      <p class="progreso" id="u1-progreso"></p>
+      <div class="calibrador">
+        <h3>Calibrar paso a paso</h3>
+        <ol>
+          <li>Pon el rollo derecho y con las guías ajustadas. <b>Arranca todo lo que ya esté impreso</b>: deben
+            quedar solo etiquetas en blanco (si no, la impresora puede imprimir encima). Conecta la U1.</li>
+          <li><button type="button" class="btn" id="cal-guia">Imprimir guía de calibración</button>
+            <small>Imprímela <b>una sola vez</b>. Sale una regla horizontal con números (mm) y una vertical
+            con marcas 0, +2, +4… (el 0 debería quedar justo en el borde de arriba).</small></li>
+          <li>En la etiqueta con la guía, lee qué número queda justo en cada borde. Cada rayita es 1 mm: si el borde
+            cae 1 rayita antes del 10, escribe 9. Si el borde queda más allá del último número (48), escribe 49.
+            Borde de arriba: si el borde corta la regla vertical, elige la marca que queda en el borde (p. ej. +2).
+            Si arriba del 0 queda espacio en blanco, elige cuántos mm de blanco hay en negativo (2 mm → −2).
+            <div class="u1-grid">
+              <label>Borde izquierdo<input type="number" id="cal-izq" step="0.5" inputmode="decimal" placeholder="p. ej. 8" /></label>
+              <label>Borde derecho<input type="number" id="cal-der" step="0.5" inputmode="decimal" placeholder="p. ej. 48" /></label>
+              <label>Borde de arriba <small>(regla vertical)</small><select id="cal-arriba">
+                ${Array.from({ length: 33 }, (_, i) => (i - 16) / 2)
+                  .map((v) => `<option value="${v}" ${v === 0 ? "selected" : ""}>${v > 0 ? "+" : v < 0 ? "−" : ""}${Math.abs(v).toLocaleString("es")}</option>`)
+                  .join("")}
+              </select></label>
+            </div>
+            <button type="button" class="btn primario" id="cal-aplicar">Aplicar calibración</button>
+            <p class="ayuda" id="cal-resultado"></p></li>
+          <li>Imprime la <b>prueba</b> (botón de arriba): el marco debe caer en el borde de la etiqueta.</li>
+          <li>Si al terminar hay que jalar un poco la etiqueta para arrancarla, es normal en esta impresora
+            (la app original hace lo mismo). Puedes sumar avance extra, pero la siguiente impresión tendrá que
+            retroceder más y puede quedar menos precisa.
+            <div class="acciones-sec envolver">
+              <button type="button" class="btn" id="cal-falta">Avanzar más al terminar (+1 mm)</button>
+              <button type="button" class="btn" id="cal-sobra">Avanzar menos (−1 mm)</button>
+              <button type="button" class="btn" id="cal-restablecer">Restablecer calibración</button>
+            </div></li>
+        </ol>
+      </div>
+      <div class="calibrador">
+        <h3>Etiqueta de prueba</h3>
+        <div class="u1-grid">
+          <label>Perfume<select id="e30-perfume">${opcionesPerfumes()}</select></label>
+          <label>Volumen (ml)<input id="e30-vol" value="30" inputmode="numeric" /></label>
+        <label>Margen arriba (mm) <small>(más = el diseño baja)</small><select data-u1="margenArribaMm">${opc(
+          [0, 0.5, 1, 1.5, 2, 2.5, 3, 3.5, 4],
+          o.margenArribaMm,
+        )}</select></label>
+        </div>
+        <figure class="vista-previa"><canvas id="e30-previa" class="u1-previa"></canvas>
+          <figcaption>Así sale en el cabezal (la zona blanca a los lados no es etiqueta)</figcaption></figure>
+        <button type="button" class="btn primario" id="e30-imprimir">Imprimir etiqueta</button>
+      </div>
+      <details class="u1-avanzado">
+      <summary>Ajustes manuales</summary>
+      <div class="u1-grid">
+        <label>Ancho (mm)<input type="number" data-u1="anchoMm" value="${o.anchoMm}" min="15" max="48" /></label>
+        <label>Alto (mm)<input type="number" data-u1="altoMm" value="${o.altoMm}" min="10" max="100" /></label>
+        <label>Desplazamiento (px, 8 = 1 mm)<select data-u1="desplazamiento">${opc(
+          // Pasos de 4 px (½ mm), e incluye siempre el valor actual (la calibración puede dar cualquiera).
+          [...new Set([...Array.from({ length: 33 }, (_, i) => (i - 16) * 4), o.desplazamiento])].sort((a, b) => a - b),
+          o.desplazamiento,
+        )}</select></label>
+        <label>Densidad<select data-u1="densidad">${opc([1, 2, 3, 4, 5], o.densidad)}</select></label>
+        <label>Energía (calor)<select data-u1="energia">${opc([8000, 10000, 12000, 14000, 16000, 20000], o.energia, (v) =>
+          `${v}${Number(v) === 20000 ? " (original)" : Number(v) === 12000 ? " (más rápido)" : ""}`)}</select></label>
+        <label>Velocidad <small>(menor = más rápido)</small><select data-u1="velocidad">${opc([5, 6, 8, 10, 15, 20], o.velocidad, (v) =>
+          `${v}${Number(v) === 10 ? " (original)" : ""}`)}</select></label>
+        <label>Avance al terminar<select data-u1="avance">${opc(Object.keys(avances), o.avance, (v) => avances[String(v)])}</select></label>
+        <label>mm de avance<input type="number" data-u1="avanceMm" value="${o.avanceMm}" min="0" max="60" /></label>
+        <label>Modo BE<select data-u1="modoBE">${opc([0, 1], o.modoBE, (v) => (Number(v) === 0 ? "0 (imagen)" : "1 (texto/etiqueta)"))}</select></label>
+        <label>Bloque BLE<select data-u1="bloque">${opc([20, 100, 180], o.bloque, (v) => `${v} bytes`)}</select></label>
+        <label>Avance para arrancar (mm)<input type="number" data-u1="extraMm" value="${o.extraMm}" min="0" max="20" step="0.5" /></label>
+        <label>Corrección de inicio (mm) <small>(menos = la impresión baja)</small><select data-u1="inicioMm">${opc(
+          // Lista (el teclado numérico de Android no tiene signo menos); incluye siempre el valor actual.
+          [...new Set([...Array.from({ length: 47 }, (_, i) => (i - 16) / 2), o.inicioMm])].sort((a, b) => a - b),
+          o.inicioMm,
+          (v) => `${Number(v) > 0 ? "+" : Number(v) < 0 ? "−" : ""}${Math.abs(Number(v)).toLocaleString("es")}`,
+        )}</select></label>
+      </div>
+      </details>
+      <figure class="vista-previa"><canvas id="u1-previa" class="u1-previa"></canvas><figcaption>Vista previa (384 puntos de ancho)</figcaption></figure>
+      <pre class="diag-salida" id="u1-avisos">${esc(u1.avisos.join("\n") || "Avisos de la impresora: —")}</pre>
+    </details>`;
+}
+
+function enlazarU1(): void {
+  const o = estado.ajustes.u1;
+  const previa = () => {
+    void cargarImagen(urlLogoTienda()).then((logo) => {
+      const c = lienzoPruebaU1(o.anchoMm, o.altoMm, o.desplazamiento, logo);
+      const destino = document.getElementById("u1-previa") as HTMLCanvasElement | null;
+      if (!destino) return;
+      destino.width = c.width;
+      destino.height = c.height;
+      destino.getContext("2d")!.drawImage(c, 0, 0);
+    });
+  };
+  previa();
+  $$<HTMLInputElement | HTMLSelectElement>("[data-u1]").forEach((el) =>
+    el.addEventListener("change", () => {
+      const clave = el.dataset.u1!;
+      (o as unknown as Record<string, unknown>)[clave] =
+        clave === "avance" ? el.value : Number(el.value);
+      guardarAjustes();
+      previa();
+      void previa30?.();
+      // Confirmación visible: el valor se guarda al salir del campo (o al elegir en la lista).
+      const nombre = el.closest("label")?.firstChild?.textContent?.trim() || clave;
+      const valor = el instanceof HTMLSelectElement ? el.selectedOptions[0]?.textContent : el.value;
+      aviso(`Guardado: ${nombre} = ${valor}`);
+    }),
+  );
+  const avisos = document.getElementById("u1-avisos");
+  u1.alAviso = () => {
+    if (avisos) avisos.textContent = u1.avisos.join("\n");
+  };
+  $("#u1-conectar").addEventListener("click", async (e) => {
+    try {
+      await u1.conectar();
+      (e.target as HTMLButtonElement).textContent = `Conectada: ${u1.nombre}`;
+      aviso("U1 conectada");
+    } catch (err) {
+      aviso(mensajeError(err), "error");
+    }
+  });
+  const imprimirU1 = async (btn: HTMLButtonElement, lienzo: () => Promise<HTMLCanvasElement>, retrocesoExtra = 0) => {
+    const progreso = $("#u1-progreso");
+    btn.disabled = true;
+    try {
+      const inicio = performance.now();
+      await u1.imprimir(await lienzo(), 1, o, (t) => (progreso.textContent = t), retrocesoExtra);
+      aviso(`Prueba enviada a la U1 en ${((performance.now() - inicio) / 1000).toFixed(1)} s`);
+      $("#u1-conectar").textContent = `Conectada: ${u1.nombre}`;
+    } catch (err) {
+      aviso("No se pudo imprimir en la U1: " + mensajeError(err), "error");
+    } finally {
+      btn.disabled = false;
+      progreso.textContent = "";
+    }
+  };
+  $("#u1-imprimir").addEventListener("click", (e) =>
+    imprimirU1(e.currentTarget as HTMLButtonElement, async () =>
+      lienzoPruebaU1(o.anchoMm, o.altoMm, o.desplazamiento, await cargarImagen(urlLogoTienda())),
+    ),
+  );
+  $("#u1-regla").addEventListener("click", (e) =>
+    imprimirU1(e.currentTarget as HTMLButtonElement, async () => lienzoReglaU1(o.altoMm)),
+  );
+
+  $("#u1-avanzar").addEventListener("click", async (e) => {
+    const btn = e.currentTarget as HTMLButtonElement;
+    btn.disabled = true;
+    try {
+      await u1.avanzarAlHueco(o);
+      aviso("Avance enviado: debería detenerse al inicio de la siguiente etiqueta");
+    } catch (err) {
+      aviso(mensajeError(err), "error");
+    } finally {
+      btn.disabled = false;
+    }
+  });
+
+  // ----- etiqueta de prueba (30 ml) -----
+  const lienzoEtiqueta30 = async () => {
+    const p = estado.perfumes.find((x) => x.id === ($("#e30-perfume") as HTMLSelectElement).value) ?? estado.perfumes[0];
+    const volumen = ($("#e30-vol") as HTMLInputElement).value.trim() || "30";
+    return (await etiquetaGrande({ nombre: p?.nombre ?? "Perfume", marca: p?.marca ?? "", volumen })).lienzo;
+  };
+  const previa30 = async () => {
+    const c = await lienzoEtiqueta30();
+    const destino = document.getElementById("e30-previa") as HTMLCanvasElement | null;
+    if (!destino) return;
+    destino.width = c.width;
+    destino.height = c.height;
+    destino.getContext("2d")!.drawImage(c, 0, 0);
+  };
+  void previa30();
+  $("#e30-perfume").addEventListener("change", () => void previa30());
+  $("#e30-vol").addEventListener("input", () => void previa30());
+  $("#e30-imprimir").addEventListener("click", (e) => imprimirU1(e.currentTarget as HTMLButtonElement, lienzoEtiqueta30));
+
+  // ----- calibrador -----
+  $("#cal-guia").addEventListener("click", (e) =>
+    imprimirU1(e.currentTarget as HTMLButtonElement, async () => lienzoGuiaU1(o.altoMm), GUIA_PREVIA_MM),
+  );
+  $("#cal-aplicar").addEventListener("click", () => {
+    // El borde de arriba es un <select> (el teclado numérico de Android no tiene signo menos).
+    const leer = (id: string) => Number(($(`#${id}`) as HTMLInputElement | HTMLSelectElement).value.replace(",", "."));
+    const izq = leer("cal-izq"), der = leer("cal-der"), arriba = leer("cal-arriba");
+    const crudo = ["cal-izq", "cal-der"].map((id) => ($(`#${id}`) as HTMLInputElement).value.trim());
+    if (crudo.some((v) => v === "") || [izq, der, arriba].some((n) => Number.isNaN(n))) {
+      return aviso("Escribe los tres números que leíste en la guía", "error");
+    }
+    if (der <= izq) return aviso("El borde derecho debe ser mayor que el izquierdo", "error");
+    const r = calcularCalibracionU1(o, izq, der, arriba);
+    o.desplazamiento = r.desplazamiento;
+    o.inicioMm = r.inicioMm;
+    guardarAjustes();
+    const avisoAncho =
+      Math.abs(r.anchoMedidoMm - o.anchoMm) > 1.5
+        ? ` Ojo: mediste ${r.anchoMedidoMm} mm de ancho y la etiqueta está configurada en ${o.anchoMm} mm.`
+        : "";
+    $("#cal-resultado").textContent =
+      `Guardado: desplazamiento ${r.desplazamiento} px (${(r.desplazamiento / 8).toFixed(1)} mm), ` +
+      `corrección de inicio ${r.inicioMm} mm.${avisoAncho} Ahora imprime la prueba.`;
+    aviso("Calibración guardada");
+    previa();
+  });
+  const ajustarExtra = (delta: number) => {
+    o.extraMm = Math.max(0, Math.round((o.extraMm + delta) * 2) / 2);
+    guardarAjustes();
+    aviso(`Avance para arrancar: ${o.extraMm} mm`);
+    const campo = document.querySelector<HTMLInputElement>('[data-u1="extraMm"]');
+    if (campo) campo.value = String(o.extraMm);
+  };
+  $("#cal-restablecer").addEventListener("click", () => {
+    const d = AJUSTES_DEFECTO.u1;
+    Object.assign(o, { desplazamiento: d.desplazamiento, inicioMm: d.inicioMm, extraMm: d.extraMm });
+    guardarAjustes();
+    aviso(`Calibración restablecida: ${d.desplazamiento} px, inicio ${d.inicioMm} mm, avance extra ${d.extraMm} mm`);
+    vistaAjustes();
+  });
+  $("#cal-falta").addEventListener("click", () => ajustarExtra(1));
+  $("#cal-sobra").addEventListener("click", () => ajustarExtra(-1));
+}
+
 // ---------- ajustes ----------
 
 function nombreTipo(t: number | undefined): string {
@@ -616,6 +1012,25 @@ function vistaAjustes(): void {
       </label>
     </section>
 
+    ${
+      CANAL === "dev"
+        ? `<section class="tarjeta formulario">
+      <h2>Buscar otra impresora <small>(diagnóstico)</small></h2>
+      <p class="ayuda">Cierra la app de la impresora (p. ej. Tiny Print) y enciéndela. Luego:</p>
+      <div class="acciones-sec envolver">
+        <button type="button" class="btn" id="diag-ble">Buscar por Bluetooth (BLE)</button>
+        <button type="button" class="btn" id="diag-serie">Buscar por Bluetooth clásico</button>
+      </div>
+      <p class="ayuda">"BLE" muestra todos los dispositivos cercanos: elige el que aparezca al encender la impresora.
+        "Clásico" solo muestra impresoras ya vinculadas en Ajustes → Bluetooth del teléfono.</p>
+      <pre class="diag-salida" id="diag-salida" hidden></pre>
+      <button type="button" class="btn" id="diag-copiar" hidden>Copiar resultado</button>
+    </section>`
+        : ""
+    }
+
+    ${seccionU1()}
+
     <section class="tarjeta">
       <h2>Logo de la tienda</h2>
       <div class="logo-tienda">
@@ -676,6 +1091,29 @@ function vistaAjustes(): void {
     a.resolucion = r;
     guardarAjustes();
     repintar();
+  });
+  enlazarU1();
+  const salidaDiag = document.getElementById("diag-salida");
+  const diagnosticar = async (fn: () => Promise<string>) => {
+    if (!salidaDiag) return;
+    salidaDiag.hidden = false;
+    salidaDiag.textContent = "Buscando…";
+    try {
+      salidaDiag.textContent = await fn();
+      $("#diag-copiar").hidden = false;
+    } catch (e) {
+      salidaDiag.textContent = "No se pudo: " + mensajeError(e);
+    }
+  };
+  document.getElementById("diag-ble")?.addEventListener("click", () => void diagnosticar(diagnosticarBle));
+  document.getElementById("diag-serie")?.addEventListener("click", () => void diagnosticar(diagnosticarSerie));
+  document.getElementById("diag-copiar")?.addEventListener("click", async () => {
+    try {
+      await navigator.clipboard.writeText(salidaDiag?.textContent ?? "");
+      aviso("Resultado copiado: pégalo en el chat");
+    } catch {
+      aviso("No se pudo copiar; selecciona el texto y cópialo a mano", "error");
+    }
   });
   $<HTMLSelectElement>("#a-tipo").addEventListener("change", (e) => {
     const v = (e.target as HTMLSelectElement).value;

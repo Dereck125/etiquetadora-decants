@@ -1,6 +1,7 @@
 import catalogoInicial from "./datos/catalogo-inicial.json";
 import { PREFIJO } from "./entorno";
 import type { Ajustes, Perfume, Resolucion } from "./tipos";
+import { CALIBRACION_U1_VERSION, OPCIONES_U1_DEFECTO } from "./u1";
 
 const CLAVES = {
   perfumes: `${PREFIJO}perfumes`,
@@ -20,6 +21,7 @@ export const AJUSTES_DEFECTO: Ajustes = {
   densidad: 2,
   volumenes: [3, 5, 10, 30],
   volumenesCortos: [3],
+  volumenesGrandes: [30],
   largoMm: 38,
   margenSuperiorMm: 2,
   pausaEnvioMs: 10,
@@ -28,6 +30,15 @@ export const AJUSTES_DEFECTO: Ajustes = {
   resolucion: RESOLUCIONES[0],
   logoTienda: null,
   logosMarca: {},
+  // Medido con la guía: la etiqueta va de 9.5 a 49.5 mm → centro 29.5 mm → +44 puntos.
+  u1: {
+    ...OPCIONES_U1_DEFECTO,
+    anchoMm: 40,
+    altoMm: 20,
+    desplazamiento: 44,
+    margenArribaMm: 2.5,
+    version: CALIBRACION_U1_VERSION,
+  },
 };
 
 function leer<T>(clave: string): T | null {
@@ -67,9 +78,26 @@ const ajustesGuardados = leer<Partial<Ajustes> & Record<string, unknown>>(CLAVES
 delete ajustesGuardados.stockBajo;
 delete ajustesGuardados.diseno;
 
+const ajustesIniciales = { ...AJUSTES_DEFECTO, ...ajustesGuardados } as Ajustes;
+ajustesIniciales.u1 = { ...AJUSTES_DEFECTO.u1, ...(ajustesGuardados.u1 ?? {}) };
+// Calibración guardada con valores por defecto anteriores: se adoptan los nuevos medidos.
+// (se mira la versión guardada, no la fusionada: los valores por defecto ya traen la versión actual)
+const versionGuardada = (ajustesGuardados.u1 as Partial<Ajustes["u1"]> | undefined)?.version ?? 0;
+if (ajustesGuardados.u1 && versionGuardada < CALIBRACION_U1_VERSION) {
+  const d = AJUSTES_DEFECTO.u1;
+  Object.assign(ajustesIniciales.u1, {
+    desplazamiento: d.desplazamiento,
+    inicioMm: d.inicioMm,
+    extraMm: d.extraMm,
+    margenArribaMm: d.margenArribaMm,
+    version: CALIBRACION_U1_VERSION,
+  });
+}
+delete (ajustesIniciales.u1 as unknown as Record<string, unknown>).retroceso;
+
 export const estado = {
   perfumes: (leer<Perfume[]>(CLAVES.perfumes) ?? catalogoPorDefecto()).map(limpiarPerfume),
-  ajustes: { ...AJUSTES_DEFECTO, ...ajustesGuardados } as Ajustes,
+  ajustes: ajustesIniciales,
 };
 
 export function guardarPerfumes(): void {

@@ -1,4 +1,21 @@
+import type { OpcionesU1 } from "./u1";
+
 export type Genero = "Dama" | "Caballero" | "Unisex";
+
+/** Configuración de la segunda impresora (Yihetangde U1), en pruebas. */
+export interface ConfigU1 extends OpcionesU1 {
+  anchoMm: number;
+  altoMm: number;
+  /** Desplazamiento horizontal de la etiqueta respecto al centro del cabezal, en puntos. */
+  desplazamiento: number;
+  /**
+   * Filas en blanco (mm) al inicio de la imagen: bajan el diseño dentro de la etiqueta. Hace falta porque
+   * la U1 se alinea sola con el sensor y no hace caso al retroceso (con inicio 0 o −2 salía igual).
+   */
+  margenArribaMm: number;
+  /** Versión de la calibración por defecto con la que se guardó (ver CALIBRACION_U1_VERSION). */
+  version?: number;
+}
 export const GENEROS: Genero[] = ["Dama", "Caballero", "Unisex"];
 
 export interface Perfume {
@@ -29,6 +46,8 @@ export interface Ajustes {
   volumenes: number[];
   /** Volúmenes cuyo frasco solo cubre media etiqueta: se imprime en la mitad superior. */
   volumenesCortos: number[];
+  /** Volúmenes que van a la impresora grande (U1, etiqueta horizontal 40 × 20). */
+  volumenesGrandes: number[];
   /** Largo impreso en mm (la etiqueta mide 40). Por debajo de 40 para no invadir la etiqueta siguiente. */
   largoMm: number;
   /** Espacio en blanco arriba del diseño, en mm, para centrarlo en la etiqueta. */
@@ -44,6 +63,7 @@ export interface Ajustes {
   logoTienda: string | null;
   /** Logos de marca subidos por el usuario, por slug de marca (data URL). */
   logosMarca: Record<string, string>;
+  u1: ConfigU1;
 }
 
 export interface DatosEtiqueta {

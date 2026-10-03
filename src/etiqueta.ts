@@ -148,8 +148,7 @@ function marco(ctx: CanvasRenderingContext2D, w: number, h: number): void {
 }
 
 /** Separador ornamental horizontal: ——◆——. */
-function separador(ctx: CanvasRenderingContext2D, cy: number, largo: number) {
-  const cx = BASE_ANCHO / 2;
+function separador(ctx: CanvasRenderingContext2D, cy: number, largo: number, cx = BASE_ANCHO / 2) {
   const brazo = largo / 2 - 5;
   ctx.fillStyle = "#000";
   ctx.fillRect(cx - largo / 2, cy, brazo, 1);
@@ -159,6 +158,21 @@ function separador(ctx: CanvasRenderingContext2D, cy: number, largo: number) {
   ctx.lineTo(cx + 3, cy + 0.5);
   ctx.lineTo(cx, cy + 3.5);
   ctx.lineTo(cx - 3, cy + 0.5);
+  ctx.closePath();
+  ctx.fill();
+}
+
+/** Separador ornamental vertical: línea | ◆ | línea, centrado en (cx, cy). */
+function separadorVertical(ctx: CanvasRenderingContext2D, cx: number, cy: number, largo: number) {
+  const brazo = largo / 2 - 5;
+  ctx.fillStyle = "#000";
+  ctx.fillRect(cx, cy - largo / 2, 1, brazo);
+  ctx.fillRect(cx, cy + 5, 1, brazo);
+  ctx.beginPath();
+  ctx.moveTo(cx + 0.5, cy - 3);
+  ctx.lineTo(cx + 3.5, cy);
+  ctx.lineTo(cx + 0.5, cy + 3);
+  ctx.lineTo(cx - 2.5, cy);
   ctx.closePath();
   ctx.fill();
 }
@@ -287,6 +301,73 @@ export async function renderizarEtiqueta(
     dibujarCompleta(ctx, nombre(datos), datos, logos, L, ajustes.marco);
   }
 
+  binarizar(c);
+  return c;
+}
+
+/**
+ * Etiqueta horizontal para la impresora grande (U1), p. ej. 40 × 20 mm para 30 ml:
+ * nombre arriba, separador y abajo la marca (logo o texto) con el volumen en píldora.
+ * Se dibuja a `ancho` × `alto` puntos (8 px/mm) y ya en blanco y negro puro.
+ */
+export async function renderizarEtiquetaHorizontal(
+  datos: DatosEtiqueta,
+  ajustes: Ajustes,
+  ancho: number,
+  alto: number,
+): Promise<HTMLCanvasElement> {
+  await prepararFuente();
+  const [logoTienda, logoMarca] = await Promise.all([
+    cargarImagen(urlLogoTienda()),
+    cargarImagen(urlLogoMarca(datos.marca)),
+  ]);
+  const c = document.createElement("canvas");
+  c.width = ancho;
+  c.height = alto;
+  const ctx = c.getContext("2d", { willReadFrequently: true })!;
+  ctx.fillStyle = "#fff";
+  ctx.fillRect(0, 0, ancho, alto);
+
+  const nombre = ajustes.mayusculas ? datos.nombre.toUpperCase() : datos.nombre;
+  const m = 12; // margen interior (el marco ocupa ~7 px)
+
+  // Columna izquierda: logo de la tienda, y un separador vertical.
+  let x0 = m;
+  if (logoTienda) {
+    const lado = Math.min(alto - 2 * m - 4, Math.round(ancho * 0.22));
+    dibujarImagen(ctx, logoTienda, { x: m, y: (alto - lado) / 2, w: lado, h: lado });
+    const xSep = m + lado + 8;
+    separadorVertical(ctx, xSep, alto / 2, Math.round(alto * 0.6));
+    x0 = xSep + 9;
+  }
+  const anchoTexto = ancho - m - x0;
+
+  const altoNombre = Math.round(alto * 0.44);
+  dibujarTexto(ctx, nombre, { x: x0, y: m, w: anchoTexto, h: altoNombre }, { max: 40, min: 12, maxLineas: 2 });
+
+  const ySep = m + altoNombre + 5;
+  separador(ctx, ySep, Math.round(anchoTexto * 0.6), x0 + anchoTexto / 2);
+
+  const yFila = ySep + 7;
+  const altoFila = alto - m - yFila;
+  const volumen = formatoVolumen(datos.volumen);
+  const anchoPildora = volumen ? Math.min(84, Math.round(anchoTexto * 0.38)) : 0;
+  dibujarMarca(ctx, logoMarca, datos.marca, {
+    x: x0 + 2,
+    y: yFila,
+    w: anchoTexto - 4 - (anchoPildora ? anchoPildora + 10 : 0),
+    h: altoFila,
+  });
+  if (volumen) {
+    const altoPildora = Math.min(28, altoFila);
+    pildoraVolumen(
+      ctx,
+      volumen,
+      { x: ancho - m - 2 - anchoPildora, y: yFila + (altoFila - altoPildora) / 2, w: anchoPildora, h: altoPildora },
+      20,
+    );
+  }
+  if (ajustes.marco) marco(ctx, ancho, alto);
   binarizar(c);
   return c;
 }

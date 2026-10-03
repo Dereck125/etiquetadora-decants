@@ -12,6 +12,10 @@
   --ok: #2e7d4f;
   --sombra: 0 1px 2px rgb(0 0 0 / 0.06), 0 4px 16px rgb(0 0 0 / 0.06);
   --radio: 14px;
+  --verde: #1f8a5b;
+  --verde-fondo: #e3f5ec;
+  --azul: #2f6fd6;
+  --azul-fondo: #e6eefc;
   color-scheme: light;
 }
 
@@ -27,6 +31,10 @@
     --acento-texto: #15130f;
     --dorado: #cfae72;
         --sombra: 0 1px 2px rgb(0 0 0 / 0.4);
+    --verde: #4cc98d;
+    --verde-fondo: #173a2a;
+    --azul: #7aa7f5;
+    --azul-fondo: #1b2a45;
     color-scheme: dark;
   }
 }
@@ -59,6 +67,7 @@ button, input, select { font: inherit; color: inherit; }
 }
 .barra-logo { width: 34px; height: 34px; object-fit: contain; filter: invert(1); }
 .barra h1 { margin: 0; font-size: 1.25rem; font-weight: 700; flex: 1; text-transform: uppercase; letter-spacing: 0.12em; }
+.impresoras { display: flex; gap: 6px; }
 .btn-impresora {
   display: inline-flex; align-items: center; gap: 8px; max-width: 55%;
   border: 1px solid #4a4237; background: transparent; color: inherit;
@@ -80,12 +89,12 @@ button, input, select { font: inherit; color: inherit; }
 /* ---------- pestañas ---------- */
 .pestanas {
   position: sticky; top: 54px; z-index: 4;
-  display: flex; gap: 4px; overflow-x: auto; scrollbar-width: none;
+  display: flex; gap: 8px; overflow-x: auto; scrollbar-width: none;
   padding: 8px 16px; background: var(--fondo); border-bottom: 1px solid var(--borde);
 }
 .pestanas button {
-  flex: none; border: 0; background: transparent; padding: 8px 14px; border-radius: 999px;
-  color: var(--texto-2); cursor: pointer; font-weight: 600;
+  flex: 1 1 0; min-height: 52px; border: 0; background: var(--superficie-2); padding: 8px 10px; border-radius: 14px;
+  color: var(--texto); cursor: pointer; font-weight: 700; font-size: 1.05rem; line-height: 1.15;
 }
 .pestanas button.activa { background: var(--acento); color: var(--acento-texto); }
 
@@ -127,6 +136,16 @@ input:focus-visible, select:focus-visible, button:focus-visible { outline: 2px s
 .progreso { min-height: 1.2em; margin: 0; color: var(--dorado); font-weight: 600; text-align: center; }
 
 /* ---------- catálogo ---------- */
+.modos { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.modo {
+  display: grid; gap: 2px; padding: 16px 12px; border-radius: var(--radio); cursor: pointer; text-align: center;
+  border: 2px solid var(--borde); background: var(--superficie); color: var(--texto); box-shadow: var(--sombra);
+}
+.modo b { font-family: "Roboto Condensed", system-ui, sans-serif; font-size: 1.15rem; }
+.modo span { color: var(--texto-2); font-size: 0.95rem; }
+.modo.activa { border-color: var(--acento); background: var(--acento); color: var(--acento-texto); }
+.modo.activa span { color: inherit; opacity: 0.8; }
+
 .filtros { display: grid; gap: 8px; grid-template-columns: 1fr; }
 @media (min-width: 720px) { .filtros { grid-template-columns: 2fr 1fr; } .filtros .segmentado { grid-column: 1 / -1; } }
 
@@ -159,6 +178,7 @@ input:focus-visible, select:focus-visible, button:focus-visible { outline: 2px s
   box-shadow: 0 0 0 1px rgb(0 0 0 / 0.08), 0 6px 20px rgb(0 0 0 / 0.15);
 }
 @media (min-width: 640px) { .papel { height: min(60vh, 480px); } }
+.papel.horizontal { aspect-ratio: 40 / 20; height: auto; width: min(100%, 420px); }
 .papel canvas { display: block; width: 100%; height: auto; image-rendering: pixelated; }
 .vista-previa figcaption { font-size: 0.8rem; color: var(--texto-2); }
 
@@ -178,8 +198,27 @@ input:focus-visible, select:focus-visible, button:focus-visible { outline: 2px s
 @media (min-width: 640px) { .imprimir-cuerpo { grid-template-columns: auto 1fr; align-items: start; } }
 .controles { display: grid; gap: 10px; }
 .etiqueta-campo { font-weight: 600; font-size: 0.9rem; }
-.par:not([hidden]) { display: grid; gap: 8px; padding: 12px; border: 1px dashed var(--borde); border-radius: 12px; }
-.par-segunda:not([hidden]) { display: grid; gap: 4px; font-weight: 600; font-size: 0.9rem; }
+.par:not([hidden]) { display: grid; gap: 10px; }
+.par-opciones { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.par-opcion {
+  display: grid; justify-items: center; gap: 2px; padding: 12px 8px; border-radius: 14px; cursor: pointer;
+  border: 2px solid var(--borde); background: var(--superficie); color: var(--texto);
+}
+.par-opcion b { font-size: 1.1rem; font-family: "Roboto Condensed", system-ui, sans-serif; }
+.par-opcion small { font-size: 0.8rem; }
+.par-dibujo { display: grid; gap: 3px; width: 26px; padding: 3px; margin-bottom: 4px; border-radius: 4px; background: #fff; border: 1px solid #c9c2b6; }
+.par-dibujo i { display: block; height: 14px; border-radius: 2px; background: #b9b2a6; }
+.par-dibujo i + i { border-top: 1px dashed #fff; }
+.par-opcion[data-par="1"].activa { border-color: var(--azul); background: var(--azul-fondo); }
+.par-opcion[data-par="1"].activa .par-dibujo i { background: var(--azul); }
+.par-opcion[data-par="2"] small { color: var(--verde); font-weight: 700; }
+.par-opcion[data-par="2"].activa { border-color: var(--verde); background: var(--verde-fondo); }
+.par-opcion[data-par="2"].activa .par-dibujo i { background: var(--verde); }
+.par-segunda:not([hidden]) {
+  display: grid; gap: 6px; padding: 12px; border-radius: 14px; font-weight: 700; font-size: 1rem;
+  background: var(--verde-fondo); border: 2px solid var(--verde);
+}
+.par-tijera { font-weight: 600; font-size: 0.9rem; color: var(--verde); }
 .stepper { display: grid; grid-template-columns: 48px 1fr 48px; gap: 6px; }
 .stepper button { border: 1px solid var(--borde); background: var(--superficie-2); border-radius: 10px; font-size: 1.3rem; cursor: pointer; }
 .stepper input { text-align: center; font-size: 1.1rem; font-weight: 700; }
@@ -211,6 +250,19 @@ input:focus-visible, select:focus-visible, button:focus-visible { outline: 2px s
 .info-impresora { display: grid; grid-template-columns: auto 1fr; gap: 4px 12px; margin: 0; font-size: 0.9rem; }
 .info-impresora dt { color: var(--texto-2); }
 .info-impresora dd { margin: 0; font-weight: 600; overflow-wrap: anywhere; }
+
+.diag-salida {
+  margin: 0; padding: 12px; background: var(--superficie-2); border-radius: 10px; font-size: 0.8rem;
+  white-space: pre-wrap; overflow-wrap: anywhere; max-height: 50vh; overflow: auto;
+}
+
+.calibrador { border: 1px dashed var(--borde); border-radius: 12px; padding: 12px; }
+.calibrador h3 { margin: 0 0 4px; font-size: 1rem; }
+.calibrador ol { margin: 0; padding-left: 20px; display: grid; gap: 12px; }
+.calibrador li { display: grid; gap: 8px; }
+.u1-avanzado summary { cursor: pointer; font-weight: 600; margin-bottom: 8px; }
+.u1-grid { display: grid; gap: 10px; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); }
+.u1-previa { width: min(100%, 480px); image-rendering: pixelated; background: #fff; border-radius: 4px; outline: 1px dashed #c62828; }
 
 /* ---------- ejemplos en ajustes ---------- */
 .ejemplos { display: flex; gap: 20px; justify-content: center; align-items: start; }
