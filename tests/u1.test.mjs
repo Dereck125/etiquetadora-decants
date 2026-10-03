@@ -47,7 +47,7 @@ test("Empaquetado LSB primero: 1,0,1,0,1,0,1,0 = 0x55", () => {
   assert.deepEqual(empacarLinea(Uint8Array.from([1, 0, 1, 0, 1, 0, 1, 0])), [0x55]);
 });
 
-import { OPCIONES_U1_DEFECTO, trabajoU1 } from "../src/u1.ts";
+import { OPCIONES_U1_DEFECTO, retrocesoU1, trabajoU1 } from "../src/u1.ts";
 
 /** Canvas falso: 384 × alto, con la primera línea negra y el resto blanco. */
 function lienzoFalso(alto) {
@@ -73,9 +73,12 @@ test("Trabajo completo: encabezado, líneas y avance hasta el hueco", () => {
   assert.ok(t.subarray(t.length - fin.length).equals(fin), "fin: BD 0 · A1 200+0x11 (hueco) · A1 40 (arrancar) · BD 0 · A3");
 });
 
-test("Retroceso: con retroceder=true el trabajo empieza con A0 40 puntos (5 mm)", () => {
-  const t = Buffer.from(trabajoU1(lienzoFalso(1), OPCIONES_U1_DEFECTO, true));
-  assert.ok(t.subarray(0, 10).equals(Buffer.from(paquete(0xa0, [40, 0]))));
-  const sin = Buffer.from(trabajoU1(lienzoFalso(1), OPCIONES_U1_DEFECTO, false));
+test("Retroceso: inicio (4.5 mm) + avance extra de la etiqueta anterior (5 mm)", () => {
+  assert.equal(retrocesoU1(OPCIONES_U1_DEFECTO, false), 4.5);
+  assert.equal(retrocesoU1(OPCIONES_U1_DEFECTO, true), 9.5);
+  assert.equal(retrocesoU1({ ...OPCIONES_U1_DEFECTO, avance: "fijo" }, true), 0);
+  const t = Buffer.from(trabajoU1(lienzoFalso(1), OPCIONES_U1_DEFECTO, 9.5));
+  assert.ok(t.subarray(0, 10).equals(Buffer.from(paquete(0xa0, [76, 0]))), "A0 76 puntos");
+  const sin = Buffer.from(trabajoU1(lienzoFalso(1), OPCIONES_U1_DEFECTO, 0));
   assert.equal(sin[2], 0xa4, "sin retroceso empieza con A4");
 });

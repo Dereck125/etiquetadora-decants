@@ -546,15 +546,14 @@ function seccionU1(): string {
       <div class="u1-grid">
         <label>Ancho (mm)<input type="number" data-u1="anchoMm" value="${o.anchoMm}" min="15" max="48" /></label>
         <label>Alto (mm)<input type="number" data-u1="altoMm" value="${o.altoMm}" min="10" max="100" /></label>
-        <label>Desplazamiento (px)<select data-u1="desplazamiento">${opc([-48, -32, -24, -16, -8, 0, 8, 16, 24, 32, 48], o.desplazamiento)}</select></label>
+        <label>Desplazamiento (px, 8 = 1 mm)<select data-u1="desplazamiento">${opc([-48, -40, -32, -24, -16, -8, 0, 8, 16, 24, 32, 40, 48], o.desplazamiento)}</select></label>
         <label>Densidad<select data-u1="densidad">${opc([1, 2, 3, 4, 5], o.densidad)}</select></label>
         <label>Avance al terminar<select data-u1="avance">${opc(Object.keys(avances), o.avance, (v) => avances[String(v)])}</select></label>
         <label>mm de avance<input type="number" data-u1="avanceMm" value="${o.avanceMm}" min="0" max="60" /></label>
         <label>Modo BE<select data-u1="modoBE">${opc([0, 1], o.modoBE, (v) => (Number(v) === 0 ? "0 (imagen)" : "1 (texto/etiqueta)"))}</select></label>
         <label>Bloque BLE<select data-u1="bloque">${opc([20, 100, 180], o.bloque, (v) => `${v} bytes`)}</select></label>
         <label>Avance para arrancar (mm)<input type="number" data-u1="extraMm" value="${o.extraMm}" min="0" max="20" step="0.5" /></label>
-        <label>Retroceder al empezar<select data-u1="retroceso">${opc(["auto", "siempre", "nunca"], o.retroceso, (v) =>
-          ({ auto: "Automático", siempre: "Siempre", nunca: "Nunca" })[String(v)] ?? String(v))}</select></label>
+        <label>Corrección de inicio (mm)<input type="number" data-u1="inicioMm" value="${o.inicioMm}" min="0" max="15" step="0.5" /></label>
       </div>
       <figure class="vista-previa"><canvas id="u1-previa" class="u1-previa"></canvas><figcaption>Vista previa (384 puntos de ancho)</figcaption></figure>
       <pre class="diag-salida" id="u1-avisos">${esc(u1.avisos.join("\n") || "Avisos de la impresora: —")}</pre>
@@ -578,7 +577,7 @@ function enlazarU1(): void {
     el.addEventListener("change", () => {
       const clave = el.dataset.u1!;
       (o as unknown as Record<string, unknown>)[clave] =
-        clave === "avance" || clave === "retroceso" ? el.value : Number(el.value);
+        clave === "avance" ? el.value : Number(el.value);
       guardarAjustes();
       previa();
     }),
