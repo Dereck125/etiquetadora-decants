@@ -15,7 +15,7 @@ import {
 } from "./almacen";
 import { descargarTexto, perfumesACsv, perfumesDesdeCsv } from "./csv";
 import { esCorta, lienzoImpresion, renderizarEtiqueta } from "./etiqueta";
-import { impresora } from "./impresora";
+import { impresora, PAUSAS_ENVIO, type TiemposImpresion } from "./impresora";
 import { cargarLogosIncluidos, procesarLogoSubido, slugMarca, urlLogoMarca, urlLogoTienda } from "./marcas";
 import { GENEROS, type DatosEtiqueta, type Genero, type Perfume } from "./tipos";
 
@@ -141,20 +141,26 @@ async function imprimir(
   progreso?: (t: string) => void,
   pareja?: DatosEtiqueta | null,
 ): Promise<boolean> {
+  let tiempos: TiemposImpresion;
   try {
     // Conectar primero: Chrome solo abre el selector Bluetooth justo después de un toque.
     if (impresora.estado === "desconectada") await impresora.conectar();
     sincronizarResolucion();
     const etiqueta = await renderizarEtiqueta(datos, estado.ajustes, pareja);
-    await impresora.imprimir(lienzoImpresion(etiqueta, estado.ajustes), cantidad, estado.ajustes.densidad, (p, t) =>
-      progreso?.(`Imprimiendo ${Math.min(p + 1, t)} de ${t}…`),
+    progreso?.("Enviando a la impresora…");
+    tiempos = await impresora.imprimir(
+      lienzoImpresion(etiqueta, estado.ajustes),
+      cantidad,
+      { densidad: estado.ajustes.densidad, pausaMs: estado.ajustes.pausaEnvioMs },
+      (p, t) => progreso?.(`Imprimiendo ${Math.min(p + 1, t)} de ${t}…`),
     );
   } catch (e) {
     aviso("No se pudo imprimir: " + mensajeError(e), "error");
     return false;
   }
   const de = pareja ? `${datos.nombre} + ${pareja.nombre} (2 en 1)` : datos.nombre;
-  aviso(`Listo: ${cantidad} etiqueta${cantidad === 1 ? "" : "s"} de ${de}`);
+  const s = (ms: number) => (ms / 1000).toLocaleString("es", { maximumFractionDigits: 1 });
+  aviso(`Listo: ${cantidad} etiqueta${cantidad === 1 ? "" : "s"} de ${de} · ${s(tiempos.total)} s (envío ${s(tiempos.envio)} s)`);
   return true;
 }
 
@@ -491,6 +497,13 @@ function vistaRapida(): void {
 
 // ---------- ajustes ----------
 
+const NOMBRES_PAUSA: Record<(typeof PAUSAS_ENVIO)[number], string> = {
+  10: "Normal (la más segura)",
+  5: "Rápida",
+  2: "Muy rápida",
+  0: "Máxima (experimental)",
+};
+
 function vistaAjustes(): void {
   const a = estado.ajustes;
   const marcas = marcasDelCatalogo();
@@ -525,6 +538,12 @@ function vistaAjustes(): void {
         <label class="check"><input type="checkbox" data-a="marco" ${a.marco ? "checked" : ""} /> Marco decorativo</label>
         <label class="check"><input type="checkbox" data-a="mayusculas" ${a.mayusculas ? "checked" : ""} /> Nombre en mayúsculas</label>
         <label class="check"><input type="checkbox" data-a="invertir" ${a.invertir ? "checked" : ""} /> Girar 180° (si sale al revés)</label>
+        <label>Velocidad de envío
+          <select id="a-pausa">
+            ${PAUSAS_ENVIO.map((ms) => `<option value="${ms}" ${ms === a.pausaEnvioMs ? "selected" : ""}>${NOMBRES_PAUSA[ms]}</option>`).join("")}
+          </select>
+          <small>Si con una velocidad mayor la etiqueta sale cortada, incompleta o no imprime, vuelve a la anterior.</small>
+        </label>
         <label>Densidad de impresión
           <select id="a-densidad">${[1, 2, 3, 4, 5].map((d) => `<option value="${d}" ${d === a.densidad ? "selected" : ""}>${d}${d === 1 ? " (claro)" : d === 5 ? " (más oscuro)" : ""}</option>`).join("")}</select>
           <small>La D11 acepta 1–3 y la D11-H 1–5; si eliges más, se usa el máximo de tu modelo.</small>
@@ -595,6 +614,10 @@ function vistaAjustes(): void {
     a.resolucion = r;
     guardarAjustes();
     repintar();
+  });
+  $<HTMLSelectElement>("#a-pausa").addEventListener("change", (e) => {
+    a.pausaEnvioMs = Number((e.target as HTMLSelectElement).value);
+    guardarAjustes();
   });
   $<HTMLSelectElement>("#a-largo").addEventListener("change", (e) => {
     a.largoMm = Number((e.target as HTMLSelectElement).value);

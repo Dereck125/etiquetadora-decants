@@ -40,6 +40,9 @@ Web Bluetooth solo funciona en `localhost` o con HTTPS. Para usarla desde el cel
 - **Largo de impresión** (por defecto 38 mm): la imagen debe quedar un poco más corta que la etiqueta de 40 mm.
   Si llega al borde, la impresión se pasa al hueco y la impresora expulsa otra etiqueta en blanco. Si aun así
   sale una en blanco, bájalo en Ajustes.
+- **Velocidad de envío** (Ajustes): pausa entre paquetes Bluetooth. Una etiqueta de 5 ml son ~290 paquetes, así que
+  la pausa de 10 ms (la segura de niimbluelib) suma ~3 s. Rápida/Muy rápida/Máxima usan 5/2/0 ms; si la etiqueta
+  sale incompleta, vuelve a la anterior. Al terminar, el aviso muestra cuánto tardó (envío y total).
 - Si la etiqueta sale al revés, activa **Girar 180°** en Ajustes.
 - Logos de marca demasiado alargados (menos de 1.5 mm de alto en la etiqueta) se reemplazan por el nombre en texto.
 
