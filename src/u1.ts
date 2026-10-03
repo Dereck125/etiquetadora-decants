@@ -32,6 +32,13 @@ export interface OpcionesU1 {
   modoBE: 0 | 1;
   /** Bytes por escritura BLE. */
   bloque: number;
+  /**
+   * Avance extra al terminar para poder arrancar la etiqueta (distancia del sensor a la barra de corte).
+   * El perfil "u1" de TiMini usa 40 puntos = 5 mm ("back_paper_num").
+   */
+  extraMm: number;
+  /** Retroceder ese avance extra antes de imprimir: "auto" = solo si la impresión anterior lo hizo. */
+  retroceso: "auto" | "siempre" | "nunca";
 }
 
 export const OPCIONES_U1_DEFECTO: OpcionesU1 = {
@@ -40,6 +47,8 @@ export const OPCIONES_U1_DEFECTO: OpcionesU1 = {
   avanceMm: 25,
   modoBE: 0,
   bloque: 100,
+  extraMm: 5,
+  retroceso: "auto",
 };
 
 // ---------- paquetes ----------
@@ -104,13 +113,19 @@ export function empacarLinea(linea: Uint8Array): number[] {
   return out;
 }
 
-/** Arma el trabajo completo de una etiqueta a partir de un canvas de 384 de ancho. */
-export function trabajoU1(lienzo: HTMLCanvasElement, o: OpcionesU1): Uint8Array {
+/**
+ * Arma el trabajo completo de una etiqueta a partir de un canvas de 384 de ancho.
+ * @param retroceder si hay que regresar primero el avance extra de la impresión anterior.
+ */
+export function trabajoU1(lienzo: HTMLCanvasElement, o: OpcionesU1, retroceder = false): Uint8Array {
   if (lienzo.width !== U1_ANCHO) throw new Error(`El lienzo debe medir ${U1_ANCHO} px de ancho`);
   const { width: w, height: h } = lienzo;
   const px = lienzo.getContext("2d", { willReadFrequently: true })!.getImageData(0, 0, w, h).data;
   const VELOCIDAD = 10;
+  const extra = Math.round(Math.max(0, o.extraMm) * U1_PX_MM);
   const partes: Uint8Array[] = [
+    // A0 = retroceder papel (u16 LE en puntos), para empezar justo en el borde de la etiqueta.
+    ...(retroceder && extra > 0 ? [paquete(0xa0, u16(extra))] : []),
     paquete(0xa4, [0x30 + Math.min(5, Math.max(1, o.densidad))]),
     paquete(0xaf, u16(20000)),
     paquete(0xbe, [o.modoBE]),
@@ -135,6 +150,8 @@ export function trabajoU1(lienzo: HTMLCanvasElement, o: OpcionesU1): Uint8Array 
   } else if (o.avance === "hueco") {
     // A1 con el indicador 0x11: avanza buscando el hueco/marca (como "check black" de TiMini).
     partes.push(paquete(0xa1, [...u16(puntos), 0x11]));
+    // Ya en el hueco: avanzar un poco más para que la etiqueta pase la barra de corte.
+    if (extra > 0) partes.push(paquete(0xa1, u16(extra)));
   } else if (puntos > 0) {
     partes.push(paquete(0xa1, u16(puntos)));
   }
@@ -155,6 +172,23 @@ export function trabajoU1(lienzo: HTMLCanvasElement, o: OpcionesU1): Uint8Array 
 const esperar = (ms: number) => new Promise((r) => setTimeout(r, ms));
 const hex = (d: DataView) =>
   Array.from(new Uint8Array(d.buffer, d.byteOffset, d.byteLength), (b) => b.toString(16).padStart(2, "0")).join(" ");
+
+/** Recuerda (aunque se cierre la app) si la última etiqueta quedó adelantada para arrancarla. */
+const CLAVE_ADELANTADA = "u1-adelantada";
+function leerAdelantada(): boolean {
+  try {
+    return localStorage.getItem(CLAVE_ADELANTADA) === "1";
+  } catch {
+    return false;
+  }
+}
+function guardarAdelantada(v: boolean): void {
+  try {
+    localStorage.setItem(CLAVE_ADELANTADA, v ? "1" : "0");
+  } catch {
+    /* sin almacenamiento */
+  }
+}
 
 class ImpresoraU1 {
   private dispositivo?: BluetoothDevice;
@@ -217,11 +251,15 @@ class ImpresoraU1 {
 
   async imprimir(lienzo: HTMLCanvasElement, copias: number, o: OpcionesU1, progreso?: (t: string) => void) {
     if (!this.conectada) await this.conectar();
-    const trabajo = trabajoU1(lienzo, o);
+    const adelanta = o.avance === "hueco" && o.extraMm > 0;
     for (let c = 1; c <= copias; c++) {
+      const retroceder =
+        o.retroceso === "siempre" || (o.retroceso === "auto" && (c > 1 ? adelanta : leerAdelantada()));
+      const trabajo = trabajoU1(lienzo, o, retroceder);
       await this.enviar(trabajo, o.bloque, (n, t) =>
         progreso?.(`Enviando ${copias > 1 ? `copia ${c} de ${copias}, ` : ""}${Math.round((n / t) * 100)}%`),
       );
+      guardarAdelantada(adelanta);
     }
   }
 }
@@ -229,6 +267,37 @@ class ImpresoraU1 {
 export const u1 = new ImpresoraU1();
 
 // ---------- etiqueta de calibración ----------
+
+/**
+ * Regla de lado a lado del cabezal (384 puntos = 48 mm): una raya por mm, larga cada 5 mm y
+ * números en mm. Los números que quedan en los bordes de la etiqueta dicen cuánto descentrarla.
+ */
+export function lienzoReglaU1(altoMm: number): HTMLCanvasElement {
+  const h = Math.round(altoMm * U1_PX_MM);
+  const c = document.createElement("canvas");
+  c.width = U1_ANCHO;
+  c.height = h;
+  const ctx = c.getContext("2d")!;
+  ctx.fillStyle = "#fff";
+  ctx.fillRect(0, 0, U1_ANCHO, h);
+  ctx.fillStyle = "#000";
+  ctx.textAlign = "center";
+  ctx.textBaseline = "top";
+  ctx.font = '700 15px "Roboto Condensed", Arial, sans-serif';
+  for (let mm = 0; mm <= 48; mm++) {
+    const x = Math.min(U1_ANCHO - 2, mm * U1_PX_MM);
+    const largo = mm % 5 === 0 ? 34 : 14;
+    ctx.fillRect(x, 0, 2, largo);
+    ctx.fillRect(x, h - largo, 2, largo);
+    if (mm % 5 === 0) {
+      ctx.fillText(String(mm), Math.min(U1_ANCHO - 9, Math.max(9, x + 1)), 38);
+      ctx.fillText(String(mm), Math.min(U1_ANCHO - 9, Math.max(9, x + 1)), h - 54);
+    }
+  }
+  // Línea central del cabezal (24 mm).
+  ctx.fillRect(U1_ANCHO / 2 - 1, 60, 2, Math.max(0, h - 120));
+  return c;
+}
 
 /**
  * Etiqueta de prueba de ancho × alto mm, centrada en los 384 puntos (+ desplazamiento):

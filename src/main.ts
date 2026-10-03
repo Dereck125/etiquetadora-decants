@@ -15,7 +15,7 @@ import {
 } from "./almacen";
 import { descargarTexto, perfumesACsv, perfumesDesdeCsv } from "./csv";
 import { diagnosticarBle, diagnosticarSerie } from "./diagnostico";
-import { lienzoPruebaU1, u1 } from "./u1";
+import { lienzoPruebaU1, lienzoReglaU1, u1 } from "./u1";
 import { CANAL, PREFIJO } from "./entorno";
 import { esCorta, lienzoImpresion, renderizarEtiqueta } from "./etiqueta";
 import {
@@ -540,6 +540,7 @@ function seccionU1(): string {
       <div class="acciones-sec envolver">
         <button type="button" class="btn" id="u1-conectar">${u1.conectada ? `Conectada: ${esc(u1.nombre)}` : "Conectar U1"}</button>
         <button type="button" class="btn primario" id="u1-imprimir">Imprimir prueba</button>
+        <button type="button" class="btn" id="u1-regla">Imprimir regla</button>
       </div>
       <p class="progreso" id="u1-progreso"></p>
       <div class="u1-grid">
@@ -551,6 +552,9 @@ function seccionU1(): string {
         <label>mm de avance<input type="number" data-u1="avanceMm" value="${o.avanceMm}" min="0" max="60" /></label>
         <label>Modo BE<select data-u1="modoBE">${opc([0, 1], o.modoBE, (v) => (Number(v) === 0 ? "0 (imagen)" : "1 (texto/etiqueta)"))}</select></label>
         <label>Bloque BLE<select data-u1="bloque">${opc([20, 100, 180], o.bloque, (v) => `${v} bytes`)}</select></label>
+        <label>Avance para arrancar (mm)<input type="number" data-u1="extraMm" value="${o.extraMm}" min="0" max="20" step="0.5" /></label>
+        <label>Retroceder al empezar<select data-u1="retroceso">${opc(["auto", "siempre", "nunca"], o.retroceso, (v) =>
+          ({ auto: "Automático", siempre: "Siempre", nunca: "Nunca" })[String(v)] ?? String(v))}</select></label>
       </div>
       <figure class="vista-previa"><canvas id="u1-previa" class="u1-previa"></canvas><figcaption>Vista previa (384 puntos de ancho)</figcaption></figure>
       <pre class="diag-salida" id="u1-avisos">${esc(u1.avisos.join("\n") || "Avisos de la impresora: —")}</pre>
@@ -573,7 +577,8 @@ function enlazarU1(): void {
   $$<HTMLInputElement | HTMLSelectElement>("[data-u1]").forEach((el) =>
     el.addEventListener("change", () => {
       const clave = el.dataset.u1!;
-      (o as unknown as Record<string, unknown>)[clave] = clave === "avance" ? el.value : Number(el.value);
+      (o as unknown as Record<string, unknown>)[clave] =
+        clave === "avance" || clave === "retroceso" ? el.value : Number(el.value);
       guardarAjustes();
       previa();
     }),
@@ -591,14 +596,12 @@ function enlazarU1(): void {
       aviso(mensajeError(err), "error");
     }
   });
-  $("#u1-imprimir").addEventListener("click", async (e) => {
-    const btn = e.currentTarget as HTMLButtonElement;
+  const imprimirU1 = async (btn: HTMLButtonElement, lienzo: () => Promise<HTMLCanvasElement>) => {
     const progreso = $("#u1-progreso");
     btn.disabled = true;
     try {
-      const logo = await cargarImagen(urlLogoTienda());
       const inicio = performance.now();
-      await u1.imprimir(lienzoPruebaU1(o.anchoMm, o.altoMm, o.desplazamiento, logo), 1, o, (t) => (progreso.textContent = t));
+      await u1.imprimir(await lienzo(), 1, o, (t) => (progreso.textContent = t));
       aviso(`Prueba enviada a la U1 en ${((performance.now() - inicio) / 1000).toFixed(1)} s`);
       $("#u1-conectar").textContent = `Conectada: ${u1.nombre}`;
     } catch (err) {
@@ -607,7 +610,15 @@ function enlazarU1(): void {
       btn.disabled = false;
       progreso.textContent = "";
     }
-  });
+  };
+  $("#u1-imprimir").addEventListener("click", (e) =>
+    imprimirU1(e.currentTarget as HTMLButtonElement, async () =>
+      lienzoPruebaU1(o.anchoMm, o.altoMm, o.desplazamiento, await cargarImagen(urlLogoTienda())),
+    ),
+  );
+  $("#u1-regla").addEventListener("click", (e) =>
+    imprimirU1(e.currentTarget as HTMLButtonElement, async () => lienzoReglaU1(o.altoMm)),
+  );
 }
 
 // ---------- ajustes ----------
