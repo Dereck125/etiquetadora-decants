@@ -47,7 +47,17 @@ test("Empaquetado LSB primero: 1,0,1,0,1,0,1,0 = 0x55", () => {
   assert.deepEqual(empacarLinea(Uint8Array.from([1, 0, 1, 0, 1, 0, 1, 0])), [0x55]);
 });
 
-import { OPCIONES_U1_DEFECTO, retrocesoU1, trabajoU1 } from "../src/u1.ts";
+import { OPCIONES_U1_DEFECTO, calcularCalibracionU1, retrocesoU1, trabajoU1 } from "../src/u1.ts";
+
+test("Calibración: centro de la etiqueta y corrección de inicio desde la guía", () => {
+  // Etiqueta medida de 8 a 48 mm: centro 28 mm = 224 px → 32 px a la derecha del centro (192).
+  const r = calcularCalibracionU1({ ...OPCIONES_U1_DEFECTO, inicioMm: 4.5 }, 8, 48, 2);
+  assert.equal(r.desplazamiento, 32);
+  assert.equal(r.anchoMedidoMm, 40);
+  // El borde de arriba cayó en la marca +2: se retrocedía 2 mm de más → retroceder 2 mm menos.
+  assert.equal(r.inicioMm, 2.5);
+  assert.equal(calcularCalibracionU1({ ...OPCIONES_U1_DEFECTO, inicioMm: 4.5 }, 4, 44, -1.5).inicioMm, 6);
+});
 
 /** Canvas falso: 384 × alto, con la primera línea negra y el resto blanco. */
 function lienzoFalso(alto) {

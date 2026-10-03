@@ -262,11 +262,22 @@ class ImpresoraU1 {
     }
   }
 
-  async imprimir(lienzo: HTMLCanvasElement, copias: number, o: OpcionesU1, progreso?: (t: string) => void) {
+  /**
+   * @param retrocesoAdicionalMm retroceso extra solo para esta impresión (la guía de calibración
+   *   empieza unos mm antes del borde esperado).
+   */
+  async imprimir(
+    lienzo: HTMLCanvasElement,
+    copias: number,
+    o: OpcionesU1,
+    progreso?: (t: string) => void,
+    retrocesoAdicionalMm = 0,
+  ) {
     if (!this.conectada) await this.conectar();
     const adelanta = o.avance === "hueco" && o.extraMm > 0;
     for (let c = 1; c <= copias; c++) {
-      const trabajo = trabajoU1(lienzo, o, retrocesoU1(o, c > 1 ? adelanta : leerAdelantada()));
+      const retroceso = retrocesoU1(o, c > 1 ? adelanta : leerAdelantada()) + retrocesoAdicionalMm;
+      const trabajo = trabajoU1(lienzo, o, retroceso);
       await this.enviar(trabajo, o.bloque, (n, t) =>
         progreso?.(`Enviando ${copias > 1 ? `copia ${c} de ${copias}, ` : ""}${Math.round((n / t) * 100)}%`),
       );
@@ -278,6 +289,67 @@ class ImpresoraU1 {
 export const u1 = new ImpresoraU1();
 
 // ---------- etiqueta de calibración ----------
+
+/** mm que la guía de calibración empieza antes del borde esperado de la etiqueta. */
+export const GUIA_PREVIA_MM = 5;
+
+/**
+ * Guía de calibración: regla horizontal de lado a lado del cabezal (en mm, 0 a 48) a media altura
+ * y regla vertical que empieza GUIA_PREVIA_MM antes del borde esperado (marca "0" = borde esperado).
+ * Con los números que se ven en los bordes de la etiqueta se calcula el centrado y el inicio.
+ */
+export function lienzoGuiaU1(altoMm: number): HTMLCanvasElement {
+  const pre = GUIA_PREVIA_MM;
+  const h = Math.round((pre + altoMm) * U1_PX_MM);
+  const c = document.createElement("canvas");
+  c.width = U1_ANCHO;
+  c.height = h;
+  const ctx = c.getContext("2d")!;
+  ctx.fillStyle = "#fff";
+  ctx.fillRect(0, 0, U1_ANCHO, h);
+  ctx.fillStyle = "#000";
+
+  // Regla horizontal a media altura de la etiqueta.
+  const yh = Math.round((pre + altoMm / 2) * U1_PX_MM);
+  ctx.fillRect(0, yh, U1_ANCHO, 2);
+  ctx.font = '700 14px "Roboto Condensed", Arial, sans-serif';
+  ctx.textAlign = "center";
+  ctx.textBaseline = "bottom";
+  for (let mm = 0; mm <= 48; mm++) {
+    const x = Math.min(U1_ANCHO - 2, mm * U1_PX_MM);
+    const largo = mm % 5 === 0 ? 14 : 7;
+    ctx.fillRect(x, yh - largo, 2, largo * 2 + 2);
+    if (mm % 5 === 0) ctx.fillText(String(mm), Math.min(U1_ANCHO - 8, Math.max(8, x + 1)), yh - 16);
+  }
+
+  // Regla vertical (marcas cada mm, números cada 2 mm) a la derecha del centro.
+  const xv = 232;
+  ctx.textAlign = "left";
+  ctx.textBaseline = "middle";
+  ctx.font = '700 12px "Roboto Condensed", Arial, sans-serif';
+  for (let v = -pre; v <= altoMm; v++) {
+    const y = Math.round((pre + v) * U1_PX_MM);
+    const par = v % 2 === 0;
+    ctx.fillRect(xv - (par ? 14 : 7), y, par ? 28 : 14, 2);
+    if (par && Math.abs(y - yh) > 22) ctx.fillText(v > 0 ? `+${v}` : String(v), xv + 18, y + 1);
+  }
+  return c;
+}
+
+/**
+ * Calcula la calibración a partir de lo que se lee en la guía impresa.
+ * @param izq número de la regla horizontal en el borde izquierdo de la etiqueta (mm)
+ * @param der número en el borde derecho (mm)
+ * @param arriba número de la regla vertical en el borde de arriba (mm; 0 = ya estaba bien)
+ */
+export function calcularCalibracionU1(o: OpcionesU1, izq: number, der: number, arriba: number) {
+  const centroMm = (izq + der) / 2;
+  return {
+    desplazamiento: Math.round(centroMm * U1_PX_MM - U1_ANCHO / 2),
+    inicioMm: Math.max(0, Math.round((o.inicioMm - arriba) * 2) / 2),
+    anchoMedidoMm: Math.round((der - izq) * 10) / 10,
+  };
+}
 
 /**
  * Regla de lado a lado del cabezal (384 puntos = 48 mm): una raya por mm, larga cada 5 mm y
