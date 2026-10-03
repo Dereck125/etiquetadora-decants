@@ -29,6 +29,8 @@ export interface Ajustes {
   volumenes: number[];
   /** Volúmenes cuyo frasco solo cubre media etiqueta: se imprime en la mitad superior. */
   volumenesCortos: number[];
+  /** Largo impreso en mm (la etiqueta mide 40). Por debajo de 40 para no invadir la etiqueta siguiente. */
+  largoMm: number;
   resolucion: Resolucion;
   /** Logo de la tienda subido por el usuario (data URL). null = logo incluido en la app. */
   logoTienda: string | null;

@@ -33,7 +33,10 @@ Web Bluetooth solo funciona en `localhost` o con HTTPS. Para usarla desde el cel
 - **Resolución automática**: al conectar, la app lee el modelo y ajusta la imagen a su cabezal
   (D11: 203 DPI → 96 × 320 px; D11-H / D11 Pro: 300 DPI → 142 × 472 px). También se puede elegir en Ajustes.
 - **Etiqueta corta** (por defecto 3 ml): el frasco solo cubre media etiqueta, así que el diseño ocupa la mitad
-  superior (12 × 20 mm) sin el volumen. Los volúmenes se configuran en Ajustes.
+  superior (solo se envían 12 × 20 mm) sin el volumen. Los volúmenes se configuran en Ajustes.
+- **Largo de impresión** (por defecto 38 mm): la imagen debe quedar un poco más corta que la etiqueta de 40 mm.
+  Si llega al borde, la impresión se pasa al hueco y la impresora expulsa otra etiqueta en blanco. Si aun así
+  sale una en blanco, bájalo en Ajustes.
 - Si la etiqueta sale al revés, activa **Girar 180°** en Ajustes.
 - Logos de marca demasiado alargados (menos de 1.5 mm de alto en la etiqueta) se reemplazan por el nombre en texto.
 

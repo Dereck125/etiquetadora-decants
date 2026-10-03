@@ -80,7 +80,6 @@ async function pintarVistaPrevia(destino: HTMLCanvasElement, datos: DatosEtiquet
     destino.width = etiqueta.width;
     destino.height = etiqueta.height;
     destino.getContext("2d")!.drawImage(etiqueta, 0, 0);
-    destino.classList.toggle("vertical", etiqueta.height > etiqueta.width);
   }
   return etiqueta;
 }
@@ -270,7 +269,7 @@ function abrirImpresion(p: Perfume): void {
         <button class="cerrar" value="cerrar" aria-label="Cerrar">×</button>
       </header>
       <div class="imprimir-cuerpo">
-        <figure class="vista-previa"><canvas id="i-previa"></canvas><figcaption>12 × 40 mm</figcaption></figure>
+        <figure class="vista-previa"><div class="papel"><canvas id="i-previa"></canvas></div><figcaption>12 × 40 mm</figcaption></figure>
         <div class="controles">
           <label class="etiqueta-campo">Volumen</label>
           <div class="segmentado volumenes" id="i-vol">
@@ -399,7 +398,7 @@ function vistaRapida(): void {
         <p class="progreso" id="r-progreso"></p>
         <button type="button" class="btn" id="r-png">Descargar PNG</button>
       </form>
-      <figure class="vista-previa"><canvas id="r-previa"></canvas><figcaption>12 × 40 mm</figcaption></figure>
+      <figure class="vista-previa"><div class="papel"><canvas id="r-previa"></canvas></div><figcaption>12 × 40 mm</figcaption></figure>
     </section>`;
   const form = $<HTMLFormElement>("#form-rapida");
   const canvas = $<HTMLCanvasElement>("#r-previa");
@@ -455,6 +454,12 @@ function vistaAjustes(): void {
             ${resIdx < 0 ? `<option selected>${esc(a.resolucion.modelo)} · ${a.resolucion.dpi} DPI (detectada)</option>` : ""}
           </select>
         </label>
+        <label>Largo de impresión <small>(la etiqueta mide 40 mm)</small>
+          <select id="a-largo">
+            ${[36, 37, 38, 39, 40].map((mm) => `<option value="${mm}" ${mm === a.largoMm ? "selected" : ""}>${mm} mm${mm === 38 ? " (recomendado)" : ""}</option>`).join("")}
+          </select>
+          <small>Si después de cada etiqueta sale otra en blanco, baja este valor.</small>
+        </label>
         <label>Etiqueta corta (media etiqueta) para <small>(ml, separados por coma)</small>
           <input id="a-cortos" value="${esc(a.volumenesCortos.join(", "))}" placeholder="Ninguno" />
         </label>
@@ -467,7 +472,7 @@ function vistaAjustes(): void {
         </label>
       </div>
       <div class="ejemplos">
-        ${ejemplos.map((e, i) => `<figure class="vista-previa"><canvas data-ejemplo="${i}"></canvas><figcaption>${esc(e.volumen)} ml</figcaption></figure>`).join("")}
+        ${ejemplos.map((e, i) => `<figure class="vista-previa"><div class="papel"><canvas data-ejemplo="${i}"></canvas></div><figcaption>${esc(e.volumen)} ml</figcaption></figure>`).join("")}
       </div>
     </section>
 
@@ -529,6 +534,11 @@ function vistaAjustes(): void {
     const r = RESOLUCIONES[Number((e.target as HTMLSelectElement).value)];
     if (!r) return;
     a.resolucion = r;
+    guardarAjustes();
+    repintar();
+  });
+  $<HTMLSelectElement>("#a-largo").addEventListener("change", (e) => {
+    a.largoMm = Number((e.target as HTMLSelectElement).value);
     guardarAjustes();
     repintar();
   });
