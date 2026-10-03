@@ -40,13 +40,15 @@ export interface OpcionesU1 {
   /** Bytes por escritura BLE. */
   bloque: number;
   /**
-   * Avance extra al terminar para poder arrancar la etiqueta (distancia del sensor a la barra de corte).
-   * El perfil "u1" de TiMini usa 40 puntos = 5 mm ("back_paper_num").
+   * Avance extra al terminar para arrancar la etiqueta sin jalarla. Por defecto 0: la siguiente
+   * impresión tendría que retroceder también esa distancia y los retrocesos largos no son precisos
+   * (en las pruebas el papel quedó en un lugar distinto cada vez).
    */
   extraMm: number;
   /**
-   * Cuánto queda adelantada la etiqueta respecto al cabezal después de buscar el hueco. Se retrocede
-   * antes de imprimir para empezar en el borde. Medido en la primera prueba: ~4.5 mm.
+   * Retroceso antes de imprimir: tras buscar el hueco la etiqueta queda adelantada respecto al
+   * cabezal. La app original usa 40 puntos = 5 mm ("back_paper_num" del perfil u1 de TiMini);
+   * en la primera prueba sin retroceso el contenido empezó ~4.5 mm tarde.
    */
   inicioMm: number;
 }
@@ -59,9 +61,12 @@ export const OPCIONES_U1_DEFECTO: OpcionesU1 = {
   avanceMm: 25,
   modoBE: 0,
   bloque: 100,
-  extraMm: 5,
-  inicioMm: 4.5,
+  extraMm: 0,
+  inicioMm: 5,
 };
+
+/** Versión de los valores calibrados por defecto: al subirla se reemplazan los guardados. */
+export const CALIBRACION_U1_VERSION = 2;
 
 // ---------- paquetes ----------
 
@@ -299,8 +304,11 @@ export const u1 = new ImpresoraU1();
 
 // ---------- etiqueta de calibración ----------
 
-/** mm que la guía de calibración empieza antes del borde esperado de la etiqueta. */
-export const GUIA_PREVIA_MM = 5;
+/**
+ * mm que la guía empieza antes del borde esperado. 0: retroceder de más para dibujar marcas
+ * negativas resultó impreciso, así que la guía usa el mismo retroceso que una etiqueta normal.
+ */
+export const GUIA_PREVIA_MM = 0;
 
 /**
  * Guía de calibración: regla horizontal de lado a lado del cabezal (en mm, 0 a 48) a media altura
@@ -310,7 +318,7 @@ export const GUIA_PREVIA_MM = 5;
  */
 export function lienzoGuiaU1(altoMm: number): HTMLCanvasElement {
   const pre = GUIA_PREVIA_MM;
-  const hasta = altoMm - pre - 1;
+  const hasta = altoMm - 1;
   const h = Math.round((pre + hasta) * U1_PX_MM);
   const c = document.createElement("canvas");
   c.width = U1_ANCHO;

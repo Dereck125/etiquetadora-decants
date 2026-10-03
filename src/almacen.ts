@@ -1,7 +1,7 @@
 import catalogoInicial from "./datos/catalogo-inicial.json";
 import { PREFIJO } from "./entorno";
 import type { Ajustes, Perfume, Resolucion } from "./tipos";
-import { OPCIONES_U1_DEFECTO } from "./u1";
+import { CALIBRACION_U1_VERSION, OPCIONES_U1_DEFECTO } from "./u1";
 
 const CLAVES = {
   perfumes: `${PREFIJO}perfumes`,
@@ -29,8 +29,8 @@ export const AJUSTES_DEFECTO: Ajustes = {
   resolucion: RESOLUCIONES[0],
   logoTienda: null,
   logosMarca: {},
-  // Desplazamiento medido en la primera prueba: la etiqueta queda ~4 mm a la derecha del centro.
-  u1: { ...OPCIONES_U1_DEFECTO, anchoMm: 40, altoMm: 20, desplazamiento: 32 },
+  // Medido con la guía (dos veces igual): la etiqueta va de ~9 a ~49 mm → centro 29 mm → +40 puntos.
+  u1: { ...OPCIONES_U1_DEFECTO, anchoMm: 40, altoMm: 20, desplazamiento: 40, version: CALIBRACION_U1_VERSION },
 };
 
 function leer<T>(clave: string): T | null {
@@ -72,9 +72,15 @@ delete ajustesGuardados.diseno;
 
 const ajustesIniciales = { ...AJUSTES_DEFECTO, ...ajustesGuardados } as Ajustes;
 ajustesIniciales.u1 = { ...AJUSTES_DEFECTO.u1, ...(ajustesGuardados.u1 ?? {}) };
-// Configuración guardada antes de calibrar (sin inicioMm): se adopta el centrado medido.
-if (ajustesGuardados.u1 && (ajustesGuardados.u1 as Partial<Ajustes["u1"]>).inicioMm === undefined) {
-  ajustesIniciales.u1.desplazamiento = AJUSTES_DEFECTO.u1.desplazamiento;
+// Calibración guardada con valores por defecto anteriores: se adoptan los nuevos medidos.
+if ((ajustesIniciales.u1.version ?? 0) < CALIBRACION_U1_VERSION) {
+  const d = AJUSTES_DEFECTO.u1;
+  Object.assign(ajustesIniciales.u1, {
+    desplazamiento: d.desplazamiento,
+    inicioMm: d.inicioMm,
+    extraMm: d.extraMm,
+    version: CALIBRACION_U1_VERSION,
+  });
 }
 delete (ajustesIniciales.u1 as unknown as Record<string, unknown>).retroceso;
 
