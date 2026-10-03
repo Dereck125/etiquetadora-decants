@@ -11,6 +11,17 @@ export type EstadoImpresora = "desconectada" | "conectando" | "conectada" | "imp
 
 type Oyente = (estado: EstadoImpresora, detalle: string) => void;
 
+/** Tiempos de una impresión, en milisegundos. */
+export interface TiemposImpresion {
+  /** Preparar y enviar la imagen por Bluetooth. */
+  envio: number;
+  /** Desde que se empezó a enviar hasta que la impresora terminó. */
+  total: number;
+}
+
+/** Pausa entre paquetes Bluetooth: 10 ms es el valor seguro de niimbluelib; menos es más rápido. */
+export const PAUSAS_ENVIO = [10, 5, 2, 0] as const;
+
 /** Si el modelo no se reconoce, se asume una Niimbot D11. */
 const TAREA_D11: PrintTaskName = "D11_V1";
 
@@ -73,9 +84,9 @@ class Impresora {
   async imprimir(
     lienzo: HTMLCanvasElement,
     cantidad: number,
-    densidad: number,
+    opciones: { densidad: number; pausaMs: number },
     progreso?: (pagina: number, total: number) => void,
-  ): Promise<void> {
+  ): Promise<TiemposImpresion> {
     if (!this.cliente.isConnected()) await this.conectar();
     const modelo = this.cliente.getModelMetadata();
     if (modelo && lienzo.height !== modelo.printheadPixels) {
@@ -90,17 +101,22 @@ class Impresora {
 
     const trabajo = this.cliente.protocol.newPrintTask(tarea, {
       totalPages: cantidad,
-      density: Math.min(max, Math.max(min, densidad)),
+      density: Math.min(max, Math.max(min, opciones.densidad)),
       labelType: LabelType.WithGaps,
+      statusPollIntervalMs: 150,
     });
+    this.cliente.setPacketInterval(Math.max(0, opciones.pausaMs));
     const alProgreso = (e: { page: number; pagesTotal: number }) => progreso?.(e.page, e.pagesTotal);
     this.cliente.on("printprogress", alProgreso);
     this.cambiar("imprimiendo");
+    const inicio = performance.now();
     try {
       await trabajo.printInit();
       await trabajo.printPage(imagen, cantidad);
+      const envio = performance.now() - inicio;
       await trabajo.waitForPageFinished();
       await trabajo.waitForFinished();
+      return { envio, total: performance.now() - inicio };
     } finally {
       this.cliente.off("printprogress", alProgreso);
       await trabajo.printEnd().catch(() => undefined);
