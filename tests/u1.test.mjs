@@ -63,6 +63,19 @@ test("Trabajo completo: encabezado, líneas y avance hasta el hueco", () => {
   // Línea negra completa: 384 = 3 × 127 + 3, cada corrida con el bit 7 (negro).
   assert.ok(t.includes(Buffer.from(paquete(0xbf, [0xff, 0xff, 0xff, 0x83]))), "línea negra en RLE");
   assert.ok(t.includes(Buffer.from(paquete(0xbf, [127, 127, 127, 3]))), "línea blanca en RLE");
-  const fin = Buffer.concat([paquete(0xbd, [0]), paquete(0xa1, [200, 0, 0x11]), paquete(0xbd, [0]), paquete(0xa3, [0])]);
-  assert.ok(t.subarray(t.length - fin.length).equals(fin), "fin: BD 0 · A1 200 puntos + 0x11 · BD 0 · A3");
+  const fin = Buffer.concat([
+    paquete(0xbd, [0]),
+    paquete(0xa1, [200, 0, 0x11]),
+    paquete(0xa1, [40, 0]),
+    paquete(0xbd, [0]),
+    paquete(0xa3, [0]),
+  ]);
+  assert.ok(t.subarray(t.length - fin.length).equals(fin), "fin: BD 0 · A1 200+0x11 (hueco) · A1 40 (arrancar) · BD 0 · A3");
+});
+
+test("Retroceso: con retroceder=true el trabajo empieza con A0 40 puntos (5 mm)", () => {
+  const t = Buffer.from(trabajoU1(lienzoFalso(1), OPCIONES_U1_DEFECTO, true));
+  assert.ok(t.subarray(0, 10).equals(Buffer.from(paquete(0xa0, [40, 0]))));
+  const sin = Buffer.from(trabajoU1(lienzoFalso(1), OPCIONES_U1_DEFECTO, false));
+  assert.equal(sin[2], 0xa4, "sin retroceso empieza con A4");
 });
