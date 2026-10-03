@@ -97,3 +97,13 @@ test("Retroceso: 5 mm fijos (back_paper_num 40); el avance extra solo suma si se
   const sin = Buffer.from(trabajoU1(lienzoFalso(1), OPCIONES_U1_DEFECTO, 0));
   assert.equal(sin[bd.length + 2], 0xa4, "sin retroceso, después de BD sigue A4");
 });
+
+import { areaImprimibleU1 } from "../src/u1.ts";
+
+test("Área imprimible: si la etiqueta se sale del cabezal se encoge con el mismo margen a los lados", () => {
+  assert.deepEqual(areaImprimibleU1(40, 0), { x: 32, ancho: 320 });
+  // Calibrada: x0 = 32 + 44 = 76 → termina en 396, 12 px fuera de los 384 → 12 px menos por lado.
+  assert.deepEqual(areaImprimibleU1(40, 44), { x: 88, ancho: 296 });
+  // Corrida a la izquierda: empieza en -8 → se recorta 8 por lado → de 0 a 304.
+  assert.deepEqual(areaImprimibleU1(40, -40), { x: 0, ancho: 304 });
+});

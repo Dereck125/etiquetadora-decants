@@ -17,14 +17,16 @@ import { descargarTexto, perfumesACsv, perfumesDesdeCsv } from "./csv";
 import { diagnosticarBle, diagnosticarSerie } from "./diagnostico";
 import {
   GUIA_PREVIA_MM,
+  areaImprimibleU1,
   calcularCalibracionU1,
+  lienzoEtiquetaU1,
   lienzoGuiaU1,
   lienzoPruebaU1,
   lienzoReglaU1,
   u1,
 } from "./u1";
 import { CANAL, PREFIJO } from "./entorno";
-import { esCorta, lienzoImpresion, renderizarEtiqueta } from "./etiqueta";
+import { esCorta, lienzoImpresion, renderizarEtiqueta, renderizarEtiquetaHorizontal } from "./etiqueta";
 import {
   impresora,
   PAUSAS_ENVIO,
@@ -585,6 +587,16 @@ function seccionU1(): string {
             </div></li>
         </ol>
       </div>
+      <div class="calibrador">
+        <h3>Etiqueta de prueba</h3>
+        <div class="u1-grid">
+          <label>Perfume<select id="e30-perfume">${opcionesPerfumes()}</select></label>
+          <label>Volumen (ml)<input id="e30-vol" value="30" inputmode="numeric" /></label>
+        </div>
+        <figure class="vista-previa"><canvas id="e30-previa" class="u1-previa"></canvas>
+          <figcaption>Así sale en el cabezal (la zona blanca a los lados no es etiqueta)</figcaption></figure>
+        <button type="button" class="btn primario" id="e30-imprimir">Imprimir etiqueta</button>
+      </div>
       <details class="u1-avanzado">
       <summary>Ajustes manuales</summary>
       <div class="u1-grid">
@@ -680,6 +692,32 @@ function enlazarU1(): void {
       btn.disabled = false;
     }
   });
+
+  // ----- etiqueta de prueba (30 ml) -----
+  const lienzoEtiqueta30 = async () => {
+    const p = estado.perfumes.find((x) => x.id === ($("#e30-perfume") as HTMLSelectElement).value) ?? estado.perfumes[0];
+    const volumen = ($("#e30-vol") as HTMLInputElement).value.trim() || "30";
+    const area = areaImprimibleU1(o.anchoMm, o.desplazamiento);
+    const etiqueta = await renderizarEtiquetaHorizontal(
+      { nombre: p?.nombre ?? "Perfume", marca: p?.marca ?? "", volumen },
+      estado.ajustes,
+      area.ancho,
+      Math.round(o.altoMm * 8),
+    );
+    return lienzoEtiquetaU1(etiqueta, area.x);
+  };
+  const previa30 = async () => {
+    const c = await lienzoEtiqueta30();
+    const destino = document.getElementById("e30-previa") as HTMLCanvasElement | null;
+    if (!destino) return;
+    destino.width = c.width;
+    destino.height = c.height;
+    destino.getContext("2d")!.drawImage(c, 0, 0);
+  };
+  void previa30();
+  $("#e30-perfume").addEventListener("change", () => void previa30());
+  $("#e30-vol").addEventListener("input", () => void previa30());
+  $("#e30-imprimir").addEventListener("click", (e) => imprimirU1(e.currentTarget as HTMLButtonElement, lienzoEtiqueta30));
 
   // ----- calibrador -----
   $("#cal-guia").addEventListener("click", (e) =>
