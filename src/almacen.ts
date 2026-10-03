@@ -22,6 +22,8 @@ export const AJUSTES_DEFECTO: Ajustes = {
   largoMm: 38,
   margenSuperiorMm: 2,
   pausaEnvioMs: 10,
+  tipoEtiqueta: "auto",
+  tareaImpresion: "auto",
   resolucion: RESOLUCIONES[0],
   logoTienda: null,
   logosMarca: {},

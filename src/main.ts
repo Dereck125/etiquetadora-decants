@@ -15,7 +15,14 @@ import {
 } from "./almacen";
 import { descargarTexto, perfumesACsv, perfumesDesdeCsv } from "./csv";
 import { esCorta, lienzoImpresion, renderizarEtiqueta } from "./etiqueta";
-import { impresora, PAUSAS_ENVIO, type TiemposImpresion } from "./impresora";
+import {
+  impresora,
+  PAUSAS_ENVIO,
+  TAREAS_IMPRESION,
+  TIPOS_ETIQUETA,
+  type InfoImpresora,
+  type TiemposImpresion,
+} from "./impresora";
 import { cargarLogosIncluidos, procesarLogoSubido, slugMarca, urlLogoMarca, urlLogoTienda } from "./marcas";
 import { GENEROS, type DatosEtiqueta, type Genero, type Perfume } from "./tipos";
 
@@ -129,6 +136,7 @@ btnImpresora.addEventListener("click", async () => {
       await impresora.conectar();
       aviso("Impresora conectada");
       sincronizarResolucion();
+      if (vistaActual === "ajustes") vistaAjustes();
     }
   } catch (e) {
     aviso(mensajeError(e), "error");
@@ -151,7 +159,14 @@ async function imprimir(
     tiempos = await impresora.imprimir(
       lienzoImpresion(etiqueta, estado.ajustes),
       cantidad,
-      { densidad: estado.ajustes.densidad, pausaMs: estado.ajustes.pausaEnvioMs },
+      {
+        densidad: estado.ajustes.densidad,
+        pausaMs: estado.ajustes.pausaEnvioMs,
+        tipoEtiqueta: estado.ajustes.tipoEtiqueta,
+        tarea: (TAREAS_IMPRESION as readonly string[]).includes(estado.ajustes.tareaImpresion)
+          ? (estado.ajustes.tareaImpresion as (typeof TAREAS_IMPRESION)[number])
+          : "auto",
+      },
       (p, t) => progreso?.(`Imprimiendo ${Math.min(p + 1, t)} de ${t}…`),
     );
   } catch (e) {
@@ -497,6 +512,27 @@ function vistaRapida(): void {
 
 // ---------- ajustes ----------
 
+function nombreTipo(t: number | undefined): string {
+  if (!t) return "—";
+  return TIPOS_ETIQUETA[t] ?? `Tipo ${t}`;
+}
+
+/** Datos de la impresora conectada y del rollo, para diagnosticar. */
+function tablaImpresora(i: InfoImpresora | null): string {
+  if (!i) return `<p class="ayuda">Conecta la impresora para ver su modelo y los datos del rollo de etiquetas.</p>`;
+  const mm = (v?: number) => (v ? `${v.toLocaleString("es")} mm` : "—");
+  const usado = impresora.tipoEtiqueta(estado.ajustes.tipoEtiqueta);
+  const filas: [string, string][] = [
+    ["Modelo", `${i.modelo} · ${i.dpi} DPI · cabezal ${i.cabezal} px`],
+    ["Firmware / hardware", `${i.firmware ?? "—"} / ${i.hardware ?? "—"} · protocolo ${i.protocolo ?? "—"}`],
+    ["Modo automático", i.tareaAuto],
+    ["Rollo (RFID)", i.rollo.rfid ? `${nombreTipo(i.rollo.tipo)}${i.rollo.codigo ? ` · ${i.rollo.codigo}` : ""}` : "No se leyó el RFID"],
+    ["Medida del rollo", i.rollo.largoMm ? `${mm(i.rollo.anchoMm)} × ${mm(i.rollo.largoMm)}, hueco ${mm(i.rollo.huecoMm)}` : "—"],
+    ["Tipo que se usará", nombreTipo(usado)],
+  ];
+  return `<dl class="info-impresora">${filas.map(([k, v]) => `<dt>${k}</dt><dd>${esc(v)}</dd>`).join("")}</dl>`;
+}
+
 const NOMBRES_PAUSA: Record<(typeof PAUSAS_ENVIO)[number], string> = {
   10: "Normal (la más segura)",
   5: "Rápida",
@@ -560,6 +596,25 @@ function vistaAjustes(): void {
       </div>
     </section>
 
+    <section class="tarjeta formulario">
+      <h2>Impresora</h2>
+      ${tablaImpresora(impresora.info())}
+      <label>Tipo de etiqueta
+        <select id="a-tipo">
+          <option value="auto" ${a.tipoEtiqueta === "auto" ? "selected" : ""}>Automático (el que informa el rollo)</option>
+          ${Object.entries(TIPOS_ETIQUETA).map(([v, n]) => `<option value="${v}" ${String(a.tipoEtiqueta) === v ? "selected" : ""}>${esc(n)}</option>`).join("")}
+        </select>
+        <small>Si después de imprimir la impresora avanza de más y deja una etiqueta vacía, prueba otro tipo (p. ej. Transparente).</small>
+      </label>
+      <label>Modo de impresión <small>(avanzado)</small>
+        <select id="a-tarea">
+          <option value="auto" ${a.tareaImpresion === "auto" ? "selected" : ""}>Automático</option>
+          ${TAREAS_IMPRESION.map((t) => `<option value="${t}" ${a.tareaImpresion === t ? "selected" : ""}>${t}</option>`).join("")}
+        </select>
+        <small>Cambia la forma en que se le habla a la impresora. Déjalo en Automático salvo para pruebas.</small>
+      </label>
+    </section>
+
     <section class="tarjeta">
       <h2>Logo de la tienda</h2>
       <div class="logo-tienda">
@@ -620,6 +675,16 @@ function vistaAjustes(): void {
     a.resolucion = r;
     guardarAjustes();
     repintar();
+  });
+  $<HTMLSelectElement>("#a-tipo").addEventListener("change", (e) => {
+    const v = (e.target as HTMLSelectElement).value;
+    a.tipoEtiqueta = v === "auto" ? "auto" : Number(v);
+    guardarAjustes();
+    vistaAjustes();
+  });
+  $<HTMLSelectElement>("#a-tarea").addEventListener("change", (e) => {
+    a.tareaImpresion = (e.target as HTMLSelectElement).value;
+    guardarAjustes();
   });
   $<HTMLSelectElement>("#a-pausa").addEventListener("change", (e) => {
     a.pausaEnvioMs = Number((e.target as HTMLSelectElement).value);
