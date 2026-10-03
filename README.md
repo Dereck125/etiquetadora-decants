@@ -71,6 +71,13 @@ Web Bluetooth solo funciona en `localhost` o con HTTPS. Para usarla desde el cel
   Versace, Yves Saint Laurent. Nautica se arma apilada (vela arriba) desde el SVG de Wikimedia con
   `node tools/logos/nautica-apilado.mjs`. Las 23 marcas del catálogo tienen logo.
 
+## Agregar un logo desde GitHub (sin programar)
+
+1. En GitHub, carpeta `logos-nuevos/` (rama `develop`) → **Add file → Upload files**.
+2. Nombra la imagen como la marca del catálogo (`Lattafa Perfumes.png`) y **Commit changes**.
+3. El workflow `.github/workflows/logos.yml` la convierte con `tools/logos/procesar-nuevos.mjs` +
+   `generar-logos.mjs --local`, la publica en `/dev/` y abre el Pull Request a `master`. Al aceptarlo queda en la app.
+
 ## Catálogo inicial
 
 `src/datos/catalogo-inicial.json` se genera desde la base de `label-maker`:
