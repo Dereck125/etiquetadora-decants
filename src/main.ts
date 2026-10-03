@@ -616,16 +616,32 @@ function abrirEditor(p: Perfume | null): void {
 const rapida: DatosEtiqueta & { cantidad: number } = { nombre: "", marca: "", volumen: "5", cantidad: 1 };
 
 function vistaRapida(): void {
+  const marcas = marcasDelCatalogo();
+  // Todos los volúmenes (chicos y grandes): con uno grande se usa la impresora grande.
+  const vols = [...new Set([...volumenesDe("chica"), ...volumenesDe("grande")])].sort((a, b) => Number(a) - Number(b));
+  if (!vols.includes(rapida.volumen)) rapida.volumen = vols[0] ?? "5";
+  const marcaConocida = !rapida.marca || marcas.includes(rapida.marca);
   $("#vista").innerHTML = `
     <section class="tarjeta rapida">
       <form class="formulario" id="form-rapida">
         <p class="ayuda">Imprime una etiqueta sin guardarla en el catálogo.</p>
         <label>Nombre del perfume<input name="nombre" value="${esc(rapida.nombre)}" placeholder="Ej. Khamrah" autocomplete="off" /></label>
-        <label>Marca<input name="marca" list="lista-marcas-r" value="${esc(rapida.marca)}" placeholder="Ej. Lattafa" autocomplete="off" /></label>
-        <datalist id="lista-marcas-r">${marcasDelCatalogo().map((m) => `<option value="${esc(m)}">`).join("")}</datalist>
-        <label>Volumen <small>(número en ml o texto libre)</small><input name="volumen" value="${esc(rapida.volumen)}" /></label>
+        <label>Marca
+          <select id="r-marca">
+            <option value="">— Elige la marca —</option>
+            ${marcas.map((m) => `<option ${m === rapida.marca ? "selected" : ""}>${esc(m)}</option>`).join("")}
+            <option value="__otra" ${marcaConocida ? "" : "selected"}>Otra marca…</option>
+          </select>
+        </label>
+        <label id="r-otra" ${marcaConocida ? "hidden" : ""}>Escribe la marca
+          <input id="r-otra-texto" value="${marcaConocida ? "" : esc(rapida.marca)}" placeholder="Ej. Lattafa" autocomplete="off" />
+        </label>
+        <label class="etiqueta-campo">Volumen</label>
+        <div class="segmentado volumenes" id="r-vol">
+          ${vols.map((v) => `<button type="button" data-v="${v}">${v} ml</button>`).join("")}
+        </div>
         <label>Cantidad<input name="cantidad" type="number" min="1" max="99" value="${rapida.cantidad}" inputmode="numeric" /></label>
-        <button type="submit" class="btn primario grande">Imprimir</button>
+        <button type="submit" class="btn primario grande" id="r-imprimir">Imprimir</button>
         <p class="progreso" id="r-progreso"></p>
         <button type="button" class="btn" id="r-png">Descargar PNG</button>
       </form>
@@ -633,25 +649,43 @@ function vistaRapida(): void {
     </section>`;
   const form = $<HTMLFormElement>("#form-rapida");
   const canvas = $<HTMLCanvasElement>("#r-previa");
+  const selMarca = $<HTMLSelectElement>("#r-marca");
+  const otra = $<HTMLInputElement>("#r-otra-texto");
   const leer = () => {
     const f = new FormData(form);
     rapida.nombre = String(f.get("nombre"));
-    rapida.marca = String(f.get("marca"));
-    rapida.volumen = String(f.get("volumen"));
+    rapida.marca = selMarca.value === "__otra" ? otra.value.trim() : selMarca.value;
     rapida.cantidad = Math.max(1, parseInt(String(f.get("cantidad")), 10) || 1);
   };
-  const previa = () => void pintarVistaPrevia(canvas, { ...rapida, nombre: rapida.nombre || "Nombre del perfume" });
-  previa();
+  const actualizar = () => {
+    $$("#r-vol button").forEach((b) => b.classList.toggle("activa", b.dataset.v === rapida.volumen));
+    $("#r-otra").hidden = selMarca.value !== "__otra";
+    $("#r-imprimir").textContent = `Imprimir en la impresora ${esGrande(rapida.volumen) ? "grande" : "chica"}`;
+    void pintarVistaPrevia(canvas, { ...rapida, nombre: rapida.nombre || "Nombre del perfume" });
+  };
+  actualizar();
   form.addEventListener("input", () => {
     leer();
-    previa();
+    actualizar();
   });
+  selMarca.addEventListener("change", () => {
+    leer();
+    actualizar();
+    if (selMarca.value === "__otra") otra.focus();
+  });
+  $$("#r-vol button").forEach((b) =>
+    b.addEventListener("click", () => {
+      rapida.volumen = b.dataset.v!;
+      leer();
+      actualizar();
+    }),
+  );
   $("#r-png").addEventListener("click", () => void descargarPng(rapida));
   form.addEventListener("submit", async (e) => {
     e.preventDefault();
     leer();
     if (!rapida.nombre.trim()) return aviso("Escribe el nombre del perfume", "error");
-    const btn = form.querySelector<HTMLButtonElement>("[type=submit]")!;
+    const btn = $<HTMLButtonElement>("#r-imprimir");
     const progreso = $("#r-progreso");
     btn.disabled = true;
     progreso.textContent = "Enviando a la impresora…";
