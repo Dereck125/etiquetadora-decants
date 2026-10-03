@@ -69,13 +69,20 @@ function lienzoFalso(alto) {
 
 test("Trabajo completo: encabezado, líneas y avance hasta el hueco", () => {
   const t = Buffer.from(trabajoU1(lienzoFalso(2), { ...OPCIONES_U1_DEFECTO, densidad: 3, avance: "hueco", avanceMm: 25 }));
-  const inicio = [paquete(0xa4, [0x33]), paquete(0xaf, [0x20, 0x4e]), paquete(0xbe, [0]), paquete(0xbd, [10])];
-  assert.ok(t.subarray(0, Buffer.concat(inicio).length).equals(Buffer.concat(inicio)), "encabezado A4 33 · AF 20000 · BE 0 · BD 10");
+  const inicio = [
+    paquete(0xbd, [10]),
+    paquete(0xa4, [0x33]),
+    paquete(0xaf, [0x20, 0x4e]),
+    paquete(0xbe, [0]),
+    paquete(0xbd, [10]),
+  ];
+  assert.ok(t.subarray(0, Buffer.concat(inicio).length).equals(Buffer.concat(inicio)), "encabezado BD 10 · A4 33 · AF 20000 · BE 0 · BD 10");
   // Línea negra completa: 384 = 3 × 127 + 3, cada corrida con el bit 7 (negro).
   assert.ok(t.includes(Buffer.from(paquete(0xbf, [0xff, 0xff, 0xff, 0x83]))), "línea negra en RLE");
   assert.ok(t.includes(Buffer.from(paquete(0xbf, [127, 127, 127, 3]))), "línea blanca en RLE");
-  const fin = Buffer.concat([paquete(0xbd, [0]), paquete(0xa1, [200, 0, 0x11]), paquete(0xbd, [0]), paquete(0xa3, [0])]);
-  assert.ok(t.subarray(t.length - fin.length).equals(fin), "fin: BD 0 · A1 200+0x11 (hueco) · BD 0 · A3");
+  const fin = Buffer.concat([paquete(0xbd, [10]), paquete(0xa1, [200, 0, 0x11]), paquete(0xbd, [10]), paquete(0xa3, [0])]);
+  assert.ok(t.subarray(t.length - fin.length).equals(fin), "fin: BD 10 · A1 200+0x11 (hueco) · BD 10 · A3");
+  assert.ok(!t.includes(Buffer.from(paquete(0xbd, [0]))), "nunca BD 0: la impresora no movería el papel");
 });
 
 test("Retroceso: 5 mm fijos (back_paper_num 40); el avance extra solo suma si se usó", () => {
@@ -84,7 +91,9 @@ test("Retroceso: 5 mm fijos (back_paper_num 40); el avance extra solo suma si se
   assert.equal(retrocesoU1({ ...OPCIONES_U1_DEFECTO, extraMm: 3 }, true), 8);
   assert.equal(retrocesoU1({ ...OPCIONES_U1_DEFECTO, avance: "fijo" }, true), 0);
   const t = Buffer.from(trabajoU1(lienzoFalso(1), OPCIONES_U1_DEFECTO, 5));
-  assert.ok(t.subarray(0, 10).equals(Buffer.from(paquete(0xa0, [40, 0]))), "A0 40 puntos");
+  const bd = Buffer.from(paquete(0xbd, [10]));
+  assert.ok(t.subarray(0, bd.length).equals(bd), "primero la velocidad (para que el papel pueda moverse)");
+  assert.ok(t.subarray(bd.length, bd.length + 10).equals(Buffer.from(paquete(0xa0, [40, 0]))), "luego A0 40 puntos");
   const sin = Buffer.from(trabajoU1(lienzoFalso(1), OPCIONES_U1_DEFECTO, 0));
-  assert.equal(sin[2], 0xa4, "sin retroceso empieza con A4");
+  assert.equal(sin[bd.length + 2], 0xa4, "sin retroceso, después de BD sigue A4");
 });

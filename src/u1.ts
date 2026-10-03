@@ -141,7 +141,11 @@ export function trabajoU1(lienzo: HTMLCanvasElement, o: OpcionesU1, retrocesoMm 
   const VELOCIDAD = Math.min(255, Math.max(4, Math.round(o.velocidad)));
   const extra = Math.round(Math.max(0, o.extraMm) * U1_PX_MM);
   const retroceso = Math.round(Math.max(0, retrocesoMm) * U1_PX_MM);
+  // BD fija la velocidad también para avanzar/retroceder papel. Con valores menores a 4 la impresora
+  // no mueve el papel (Cat-Printer lo documenta y en la U1 las impresiones salían pegadas una tras
+  // otra), así que nunca se manda BD 0 como hace TiMini: avance y retroceso usan la misma velocidad.
   const partes: Uint8Array[] = [
+    paquete(0xbd, [VELOCIDAD]),
     // A0 = retroceder papel (u16 LE en puntos), para empezar justo en el borde de la etiqueta.
     ...(retroceso > 0 ? [paquete(0xa0, u16(retroceso))] : []),
     paquete(0xa4, [0x30 + Math.min(5, Math.max(1, o.densidad))]),
@@ -161,7 +165,7 @@ export function trabajoU1(lienzo: HTMLCanvasElement, o: OpcionesU1, retrocesoMm 
     if ((y + 1) % 200 === 0) partes.push(paquete(0xbd, [VELOCIDAD]));
   }
   // Final: avanzar hasta la siguiente etiqueta y pedir estado.
-  partes.push(paquete(0xbd, [0]));
+  partes.push(paquete(0xbd, [VELOCIDAD]));
   const puntos = Math.round(o.avanceMm * U1_PX_MM);
   if (o.avance === "timini") {
     partes.push(paquete(0xa1, u16(48)), paquete(0xa1, u16(48)));
@@ -173,7 +177,7 @@ export function trabajoU1(lienzo: HTMLCanvasElement, o: OpcionesU1, retrocesoMm 
   } else if (puntos > 0) {
     partes.push(paquete(0xa1, u16(puntos)));
   }
-  partes.push(paquete(0xbd, [0]), paquete(0xa3, [0]));
+  partes.push(paquete(0xbd, [VELOCIDAD]), paquete(0xa3, [0]));
 
   const total = partes.reduce((n, p) => n + p.length, 0);
   const out = new Uint8Array(total);
@@ -274,6 +278,18 @@ class ImpresoraU1 {
       progreso?.(Math.min(i + bloque, datos.length), datos.length);
       await esperar(4);
     }
+  }
+
+  /** Solo avanza hasta el siguiente hueco (sin imprimir), para alinear el rollo o probar el sensor. */
+  async avanzarAlHueco(o: OpcionesU1) {
+    if (!this.conectada) await this.conectar();
+    const v = Math.min(255, Math.max(4, Math.round(o.velocidad)));
+    const puntos = Math.round(Math.max(1, o.avanceMm) * U1_PX_MM);
+    await this.enviar(
+      Uint8Array.from([...paquete(0xbd, [v]), ...paquete(0xa1, [...u16(puntos), 0x11]), ...paquete(0xa3, [0])]),
+      o.bloque,
+    );
+    guardarAdelantada(false);
   }
 
   /**
