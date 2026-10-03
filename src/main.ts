@@ -592,6 +592,10 @@ function seccionU1(): string {
         <div class="u1-grid">
           <label>Perfume<select id="e30-perfume">${opcionesPerfumes()}</select></label>
           <label>Volumen (ml)<input id="e30-vol" value="30" inputmode="numeric" /></label>
+        <label>Margen arriba (mm) <small>(más = el diseño baja)</small><select data-u1="margenArribaMm">${opc(
+          [0, 0.5, 1, 1.5, 2, 2.5, 3, 3.5, 4],
+          o.margenArribaMm,
+        )}</select></label>
         </div>
         <figure class="vista-previa"><canvas id="e30-previa" class="u1-previa"></canvas>
           <figcaption>Así sale en el cabezal (la zona blanca a los lados no es etiqueta)</figcaption></figure>
@@ -650,6 +654,7 @@ function enlazarU1(): void {
         clave === "avance" ? el.value : Number(el.value);
       guardarAjustes();
       previa();
+      void previa30?.();
       // Confirmación visible: el valor se guarda al salir del campo (o al elegir en la lista).
       const nombre = el.closest("label")?.firstChild?.textContent?.trim() || clave;
       const valor = el instanceof HTMLSelectElement ? el.selectedOptions[0]?.textContent : el.value;
@@ -711,13 +716,15 @@ function enlazarU1(): void {
     const p = estado.perfumes.find((x) => x.id === ($("#e30-perfume") as HTMLSelectElement).value) ?? estado.perfumes[0];
     const volumen = ($("#e30-vol") as HTMLInputElement).value.trim() || "30";
     const area = areaImprimibleU1(o.anchoMm, o.desplazamiento);
+    // El margen de arriba se resta del alto: la imagen total sigue midiendo lo mismo que la etiqueta.
+    const margen = Math.round(Math.max(0, o.margenArribaMm) * 8);
     const etiqueta = await renderizarEtiquetaHorizontal(
       { nombre: p?.nombre ?? "Perfume", marca: p?.marca ?? "", volumen },
       estado.ajustes,
       area.ancho,
-      Math.round(o.altoMm * 8),
+      Math.round(o.altoMm * 8) - margen,
     );
-    return lienzoEtiquetaU1(etiqueta, area.x);
+    return lienzoEtiquetaU1(etiqueta, area.x, margen);
   };
   const previa30 = async () => {
     const c = await lienzoEtiqueta30();

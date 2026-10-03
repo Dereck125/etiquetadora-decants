@@ -30,7 +30,14 @@ export const AJUSTES_DEFECTO: Ajustes = {
   logoTienda: null,
   logosMarca: {},
   // Medido con la guía: la etiqueta va de 9.5 a 49.5 mm → centro 29.5 mm → +44 puntos.
-  u1: { ...OPCIONES_U1_DEFECTO, anchoMm: 40, altoMm: 20, desplazamiento: 44, version: CALIBRACION_U1_VERSION },
+  u1: {
+    ...OPCIONES_U1_DEFECTO,
+    anchoMm: 40,
+    altoMm: 20,
+    desplazamiento: 44,
+    margenArribaMm: 1,
+    version: CALIBRACION_U1_VERSION,
+  },
 };
 
 function leer<T>(clave: string): T | null {
