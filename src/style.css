@@ -147,13 +147,13 @@ input:focus-visible, select:focus-visible, button:focus-visible { outline: 2px s
 
 /* ---------- vista previa ---------- */
 .vista-previa { margin: 0; display: grid; justify-items: center; align-content: start; gap: 8px; }
-.vista-previa canvas {
-  image-rendering: pixelated; background: #fff; border-radius: 6px;
+/* El "papel" es la etiqueta física de 12 × 40 mm; la imagen impresa se ve arriba, a escala. */
+.papel {
+  aspect-ratio: 12 / 40; height: min(36vh, 480px); background: #fff; border-radius: 6px; overflow: hidden;
   box-shadow: 0 0 0 1px rgb(0 0 0 / 0.08), 0 6px 20px rgb(0 0 0 / 0.15);
-  width: min(100%, 480px); height: auto;
 }
-.vista-previa canvas.vertical { width: auto; height: min(36vh, 480px); max-width: 100%; }
-@media (min-width: 640px) { .vista-previa canvas.vertical { height: min(60vh, 480px); } }
+@media (min-width: 640px) { .papel { height: min(60vh, 480px); } }
+.papel canvas { display: block; width: 100%; height: auto; image-rendering: pixelated; }
 .vista-previa figcaption { font-size: 0.8rem; color: var(--texto-2); }
 
 /* ---------- diálogos ---------- */

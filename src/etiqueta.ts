@@ -4,15 +4,15 @@ import type { Ajustes, DatosEtiqueta, Resolucion } from "./tipos";
 /** Etiqueta física: 12 × 40 mm. */
 export const MM_ANCHO = 12;
 export const MM_LARGO = 40;
+/** Las etiquetas cortas (p. ej. 3 ml) solo imprimen la parte de arriba: 12 × 20 mm. */
+const MM_LARGO_CORTA = 20;
 
 /**
- * El diseño se describe en una cuadrícula base de 96 × 320 (8 px/mm, la D11 de 203 DPI)
- * y se escala a la resolución real de la impresora.
+ * El diseño se describe en una cuadrícula base de 8 px/mm (la D11 de 203 DPI): 96 px de ancho
+ * y 8 px por cada mm de largo. Luego se escala a la resolución real de la impresora.
  */
 const BASE_ANCHO = 96;
-const BASE_LARGO = 320;
-/** Las etiquetas cortas (p. ej. 3 ml) usan solo la mitad superior: 12 × 20 mm. */
-const BASE_LARGO_CORTA = 160;
+const BASE_PX_MM = 8;
 
 export const FUENTE = '"Roboto Condensed", "Arial Narrow", Arial, sans-serif';
 const INTERLINEA = 1.08;
@@ -31,12 +31,21 @@ type OpcionesTexto = {
   color?: string;
 };
 
-/** Tamaño en píxeles de la etiqueta para una resolución dada (ancho = a lo largo del cabezal). */
-export function dimensiones(r: Resolucion): { ancho: number; largo: number } {
+/** Tamaño en píxeles de la imagen para una resolución y un largo dados (ancho = a lo largo del cabezal). */
+export function dimensiones(r: Resolucion, largoMm: number): { ancho: number; largo: number } {
   return {
     ancho: Math.min(r.cabezal, Math.round((MM_ANCHO * r.dpi) / 25.4)),
-    largo: Math.round((MM_LARGO * r.dpi) / 25.4),
+    largo: Math.round((largoMm * r.dpi) / 25.4),
   };
+}
+
+/**
+ * Largo que se imprime. Debe quedar un poco por debajo de los 40 mm de la etiqueta: si la imagen
+ * llega al borde, la impresión se pasa al hueco y la impresora expulsa otra etiqueta en blanco.
+ */
+export function largoImpresionMm(volumen: string, ajustes: Ajustes): number {
+  if (esCorta(volumen, ajustes)) return MM_LARGO_CORTA;
+  return Math.min(MM_LARGO, Math.max(30, ajustes.largoMm));
 }
 
 export function esCorta(volumen: string, ajustes: Ajustes): boolean {
@@ -184,8 +193,8 @@ export function formatoVolumen(v: number | string): string {
 }
 
 /**
- * Dibuja la etiqueta vertical (ancho × largo de la resolución configurada), ya en blanco y negro puro.
- * Las etiquetas cortas ocupan solo la mitad superior y no llevan el volumen.
+ * Dibuja la etiqueta vertical a la resolución configurada, ya en blanco y negro puro.
+ * Las etiquetas cortas solo generan la mitad superior (12 × 20 mm) y no llevan el volumen.
  */
 export async function renderizarEtiqueta(datos: DatosEtiqueta, ajustes: Ajustes): Promise<HTMLCanvasElement> {
   await prepararFuente();
@@ -193,35 +202,38 @@ export async function renderizarEtiqueta(datos: DatosEtiqueta, ajustes: Ajustes)
     cargarImagen(urlLogoTienda()),
     cargarImagen(urlLogoMarca(datos.marca)),
   ]);
-  const { ancho, largo } = dimensiones(ajustes.resolucion);
+  const largoMm = largoImpresionMm(datos.volumen, ajustes);
+  const { ancho, largo } = dimensiones(ajustes.resolucion, largoMm);
+  /** Largo en la cuadrícula base: 304 para 38 mm, 160 para la corta. */
+  const L = Math.round(largoMm * BASE_PX_MM);
   const c = document.createElement("canvas");
   c.width = ancho;
   c.height = largo;
   const ctx = c.getContext("2d", { willReadFrequently: true })!;
   ctx.fillStyle = "#fff";
   ctx.fillRect(0, 0, ancho, largo);
-  ctx.scale(ancho / BASE_ANCHO, largo / BASE_LARGO);
+  ctx.scale(ancho / BASE_ANCHO, largo / L);
 
   const nombre = ajustes.mayusculas ? datos.nombre.toUpperCase() : datos.nombre;
 
   if (esCorta(datos.volumen, ajustes)) {
-    // 12 × 20 mm: logo, nombre y marca.
+    // 12 × 20 mm: logo, nombre y marca (sin volumen).
     if (logoTienda) dibujarImagen(ctx, logoTienda, { x: 9, y: 10, w: 78, h: 34 });
     separador(ctx, 49, 56);
     dibujarTexto(ctx, nombre, { x: 9, y: 54, w: 78, h: 58 }, { max: 26, min: 10, maxLineas: 4 });
     separador(ctx, 117, 56);
     dibujarMarca(ctx, logoMarca, datos.marca, { x: 9, y: 122, w: 78, h: 30 });
-    if (ajustes.marco) marco(ctx, BASE_ANCHO, BASE_LARGO_CORTA);
+    if (ajustes.marco) marco(ctx, BASE_ANCHO, L);
   } else {
-    // 12 × 40 mm completa.
+    // Etiqueta completa: el nombre absorbe la diferencia de largo; lo demás va anclado arriba o abajo.
     if (logoTienda) dibujarImagen(ctx, logoTienda, { x: 9, y: 10, w: 78, h: 66 });
     separador(ctx, 82, 64);
-    dibujarTexto(ctx, nombre, { x: 9, y: 88, w: 78, h: 124 }, { max: 34, min: 12, maxLineas: 6 });
-    separador(ctx, 218, 64);
-    dibujarMarca(ctx, logoMarca, datos.marca, { x: 9, y: 224, w: 78, h: 52 });
+    dibujarTexto(ctx, nombre, { x: 9, y: 88, w: 78, h: L - 196 }, { max: 34, min: 12, maxLineas: 6 });
+    separador(ctx, L - 102, 64);
+    dibujarMarca(ctx, logoMarca, datos.marca, { x: 9, y: L - 96, w: 78, h: 52 });
     const volumen = formatoVolumen(datos.volumen);
-    if (volumen) pildoraVolumen(ctx, volumen, { x: 12, y: 282, w: 72, h: 28 }, 22);
-    if (ajustes.marco) marco(ctx, BASE_ANCHO, BASE_LARGO);
+    if (volumen) pildoraVolumen(ctx, volumen, { x: 12, y: L - 38, w: 72, h: 28 }, 22);
+    if (ajustes.marco) marco(ctx, BASE_ANCHO, L);
   }
 
   binarizar(c);

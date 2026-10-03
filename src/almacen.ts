@@ -19,6 +19,7 @@ export const AJUSTES_DEFECTO: Ajustes = {
   densidad: 2,
   volumenes: [3, 5, 10, 30],
   volumenesCortos: [3],
+  largoMm: 38,
   resolucion: RESOLUCIONES[0],
   logoTienda: null,
   logosMarca: {},
