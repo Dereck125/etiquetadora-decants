@@ -7,14 +7,13 @@ import {
   catalogoPorDefecto,
   estado,
   guardarAjustes,
-  guardarHistorial,
   guardarPerfumes,
   marcasDelCatalogo,
   nuevoId,
-  stock,
+  reemplazarPerfumes,
 } from "./almacen";
 import { descargarTexto, perfumesACsv, perfumesDesdeCsv } from "./csv";
-import { formatoVolumen, lienzoImpresion, renderizarEtiqueta } from "./etiqueta";
+import { lienzoImpresion, renderizarEtiqueta } from "./etiqueta";
 import { impresora } from "./impresora";
 import { cargarLogosIncluidos, procesarLogoSubido, slugMarca, urlLogoMarca, urlLogoTienda } from "./marcas";
 import { GENEROS, type DatosEtiqueta, type Genero, type Perfume } from "./tipos";
@@ -112,51 +111,30 @@ btnImpresora.addEventListener("click", async () => {
 async function imprimir(
   datos: DatosEtiqueta,
   cantidad: number,
-  opciones: { perfume?: Perfume; volumen?: string; descontar?: boolean; progreso?: (t: string) => void },
+  progreso?: (t: string) => void,
 ): Promise<boolean> {
   try {
     // Conectar primero: Chrome solo abre el selector Bluetooth justo después de un toque.
     if (impresora.estado === "desconectada") await impresora.conectar();
     const etiqueta = await renderizarEtiqueta(datos, estado.ajustes);
     await impresora.imprimir(lienzoImpresion(etiqueta, estado.ajustes), cantidad, estado.ajustes.densidad, (p, t) =>
-      opciones.progreso?.(`Imprimiendo ${Math.min(p + 1, t)} de ${t}…`),
+      progreso?.(`Imprimiendo ${Math.min(p + 1, t)} de ${t}…`),
     );
   } catch (e) {
     aviso("No se pudo imprimir: " + mensajeError(e), "error");
     return false;
   }
-  let descontado = 0;
-  const { perfume, volumen } = opciones;
-  if (perfume && volumen && opciones.descontar) {
-    const antes = stock(perfume, volumen);
-    const despues = Math.max(0, antes - cantidad);
-    descontado = antes - despues;
-    perfume.inventario[volumen] = despues;
-    guardarPerfumes();
-  }
-  estado.historial.unshift({
-    id: nuevoId("h"),
-    fecha: new Date().toISOString(),
-    perfumeId: perfume?.id ?? null,
-    nombre: datos.nombre,
-    marca: datos.marca,
-    volumen: datos.volumen,
-    cantidad,
-    descontado,
-  });
-  guardarHistorial();
   aviso(`Listo: ${cantidad} etiqueta${cantidad === 1 ? "" : "s"} de ${datos.nombre}`);
   return true;
 }
 
 // ---------- navegación ----------
 
-type Vista = "catalogo" | "rapida" | "inventario" | "ajustes";
+type Vista = "catalogo" | "rapida" | "ajustes";
 let vistaActual: Vista = "catalogo";
 const vistas: Record<Vista, () => void> = {
   catalogo: vistaCatalogo,
   rapida: vistaRapida,
-  inventario: vistaInventario,
   ajustes: vistaAjustes,
 };
 
@@ -177,15 +155,6 @@ function miniLogo(marca: string): string {
   if (url) return `<span class="mini-logo"><img src="${esc(url)}" alt="" loading="lazy" /></span>`;
   const iniciales = marca.split(/\s+/).map((p) => p[0]).join("").slice(0, 2).toUpperCase();
   return `<span class="mini-logo vacio">${esc(iniciales || "?")}</span>`;
-}
-
-function chipsStock(p: Perfume): string {
-  return estado.ajustes.volumenes
-    .map((v) => {
-      const n = stock(p, v);
-      return `<span class="chip ${n <= estado.ajustes.stockBajo ? "bajo" : ""}" title="${v} ml">${v}<small>ml</small> ${n}</span>`;
-    })
-    .join("");
 }
 
 function perfumesFiltrados(): Perfume[] {
@@ -229,7 +198,6 @@ function vistaCatalogo(): void {
             <strong>${esc(p.nombre)}</strong>
             <small>${esc(p.marca)} · ${esc(p.genero)}${p.nota ? ` · <em>${esc(p.nota)}</em>` : ""}</small>
           </span>
-          <span class="chips">${chipsStock(p)}</span>
         </button></li>`,
           )
           .join("")
@@ -262,10 +230,13 @@ function vistaCatalogo(): void {
 
 // ---------- diálogo de impresión ----------
 
+/** Último volumen elegido: se propone de nuevo al abrir otro perfume. */
+let ultimoVolumen = "";
+
 function abrirImpresion(p: Perfume): void {
   const dlg = $<HTMLDialogElement>("#dlg-imprimir");
-  const vols = estado.ajustes.volumenes;
-  let volumen = String(vols.find((v) => stock(p, v) > 0) ?? vols[0] ?? 5);
+  const vols = estado.ajustes.volumenes.map(String);
+  let volumen = vols.includes(ultimoVolumen) ? ultimoVolumen : (vols[0] ?? "5");
 
   dlg.innerHTML = `
     <form method="dialog" class="dialogo-contenido">
@@ -278,7 +249,7 @@ function abrirImpresion(p: Perfume): void {
         <div class="controles">
           <label class="etiqueta-campo">Volumen</label>
           <div class="segmentado volumenes" id="i-vol">
-            ${vols.map((v) => `<button type="button" data-v="${v}"><b>${v} ml</b><small>stock ${stock(p, v)}</small></button>`).join("")}
+            ${vols.map((v) => `<button type="button" data-v="${v}">${v} ml</button>`).join("")}
           </div>
           <label class="etiqueta-campo" for="i-cant">Cantidad de etiquetas</label>
           <div class="stepper">
@@ -286,7 +257,6 @@ function abrirImpresion(p: Perfume): void {
             <input id="i-cant" type="number" min="1" max="99" value="1" inputmode="numeric" />
             <button type="button" data-paso="1" aria-label="Más">+</button>
           </div>
-          <label class="check"><input type="checkbox" id="i-descontar" checked /> Descontar del inventario</label>
           <button type="button" class="btn primario grande" id="i-imprimir">Imprimir</button>
           <p class="progreso" id="i-progreso"></p>
           <div class="acciones-sec">
@@ -306,7 +276,7 @@ function abrirImpresion(p: Perfume): void {
 
   $$("#i-vol button", dlg).forEach((b) =>
     b.addEventListener("click", () => {
-      volumen = b.dataset.v!;
+      volumen = ultimoVolumen = b.dataset.v!;
       marcarVol();
       void pintarVistaPrevia(canvas, datos());
     }),
@@ -326,18 +296,10 @@ function abrirImpresion(p: Perfume): void {
     const progreso = $("#i-progreso", dlg);
     btn.disabled = true;
     progreso.textContent = "Enviando a la impresora…";
-    const ok = await imprimir(datos(), Math.max(1, parseInt(cant.value, 10) || 1), {
-      perfume: p,
-      volumen,
-      descontar: $<HTMLInputElement>("#i-descontar", dlg).checked,
-      progreso: (t) => (progreso.textContent = t),
-    });
+    const ok = await imprimir(datos(), Math.max(1, parseInt(cant.value, 10) || 1), (t) => (progreso.textContent = t));
     btn.disabled = false;
     progreso.textContent = "";
-    if (ok) {
-      dlg.close();
-      vistas[vistaActual]();
-    }
+    if (ok) dlg.close();
   });
   dlg.showModal();
 }
@@ -346,7 +308,6 @@ function abrirImpresion(p: Perfume): void {
 
 function abrirEditor(p: Perfume | null): void {
   const dlg = $<HTMLDialogElement>("#dlg-perfume");
-  const vols = estado.ajustes.volumenes;
   dlg.innerHTML = `
     <form class="dialogo-contenido formulario" id="form-perfume">
       <header class="dialogo-cabecera">
@@ -360,9 +321,6 @@ function abrirEditor(p: Perfume | null): void {
         <select name="genero">${GENEROS.map((g) => `<option ${g === (p?.genero ?? "Unisex") ? "selected" : ""}>${g}</option>`).join("")}</select>
       </label>
       <label>Nota interna <small>(no se imprime)</small><input name="nota" value="${esc(p?.nota)}" /></label>
-      <fieldset class="stock-campos"><legend>Stock</legend>
-        ${vols.map((v) => `<label>${v} ml<input type="number" min="0" name="stock_${v}" value="${p ? stock(p, v) : 0}" inputmode="numeric" /></label>`).join("")}
-      </fieldset>
       <footer class="dialogo-pie">
         ${p ? `<button type="button" class="btn peligro" id="e-borrar">Eliminar</button>` : "<span></span>"}
         <button type="submit" class="btn primario">Guardar</button>
@@ -374,14 +332,11 @@ function abrirEditor(p: Perfume | null): void {
   form.addEventListener("submit", (e) => {
     e.preventDefault();
     const f = new FormData(form);
-    const inventario: Record<string, number> = { ...(p?.inventario ?? {}) };
-    for (const v of vols) inventario[String(v)] = Math.max(0, parseInt(String(f.get(`stock_${v}`)), 10) || 0);
     const datos = {
       nombre: String(f.get("nombre")).trim(),
       marca: String(f.get("marca")).trim(),
       genero: f.get("genero") as Genero,
       nota: String(f.get("nota")).trim(),
-      inventario,
     };
     if (p) Object.assign(p, datos);
     else estado.perfumes.push({ id: nuevoId(), activo: true, ...datos });
@@ -445,109 +400,9 @@ function vistaRapida(): void {
     const progreso = $("#r-progreso");
     btn.disabled = true;
     progreso.textContent = "Enviando a la impresora…";
-    await imprimir({ ...rapida }, rapida.cantidad, { progreso: (t) => (progreso.textContent = t) });
+    await imprimir({ ...rapida }, rapida.cantidad, (t) => (progreso.textContent = t));
     btn.disabled = false;
     progreso.textContent = "";
-  });
-}
-
-// ---------- inventario ----------
-
-let soloBajo = false;
-
-function vistaInventario(): void {
-  const vols = estado.ajustes.volumenes;
-  const umbral = estado.ajustes.stockBajo;
-  const lista = [...estado.perfumes]
-    .sort((a, b) => a.marca.localeCompare(b.marca, "es") || a.nombre.localeCompare(b.nombre, "es"))
-    .filter((p) => !soloBajo || vols.some((v) => stock(p, v) <= umbral));
-  const bajos = estado.perfumes.filter((p) => vols.some((v) => stock(p, v) <= umbral)).length;
-
-  $("#vista").innerHTML = `
-    <section class="tarjeta">
-      <div class="lista-cabecera">
-        <label class="check"><input type="checkbox" id="inv-bajo" ${soloBajo ? "checked" : ""} /> Solo stock bajo (≤ ${umbral}) · ${bajos}</label>
-        <button type="button" class="btn" id="inv-csv">Exportar CSV</button>
-      </div>
-      <div class="tabla-scroll">
-        <table class="tabla-inv">
-          <thead><tr><th>Perfume</th>${vols.map((v) => `<th>${v} ml</th>`).join("")}</tr></thead>
-          <tbody>
-            ${lista
-              .map(
-                (p) => `<tr>
-              <td><strong>${esc(p.nombre)}</strong><small>${esc(p.marca)}</small></td>
-              ${vols
-                .map((v) => {
-                  const n = stock(p, v);
-                  return `<td><input type="number" min="0" inputmode="numeric" class="${n <= umbral ? "bajo" : ""}" data-id="${esc(p.id)}" data-v="${v}" value="${n}" aria-label="${esc(p.nombre)} ${v} ml" /></td>`;
-                })
-                .join("")}
-            </tr>`,
-              )
-              .join("")}
-          </tbody>
-        </table>
-      </div>
-    </section>
-    <section class="tarjeta">
-      <div class="lista-cabecera"><h2>Historial de impresiones</h2>
-        ${estado.historial.length ? `<button type="button" class="btn" id="hist-borrar">Vaciar</button>` : ""}
-      </div>
-      <ul class="historial">
-        ${
-          estado.historial.length
-            ? estado.historial
-                .slice(0, 100)
-                .map(
-                  (h) => `<li>
-            <span><strong>${esc(h.nombre)}</strong> · ${esc(formatoVolumen(h.volumen))} × ${h.cantidad}
-              <small>${new Date(h.fecha).toLocaleString("es")}${h.descontado ? ` · −${h.descontado} del stock` : ""}</small></span>
-            ${h.descontado && h.perfumeId ? `<button type="button" class="btn" data-deshacer="${esc(h.id)}">Deshacer</button>` : ""}
-          </li>`,
-                )
-                .join("")
-            : `<li class="vacio-lista">Aún no hay impresiones.</li>`
-        }
-      </ul>
-    </section>`;
-
-  $<HTMLInputElement>("#inv-bajo").addEventListener("change", (e) => {
-    soloBajo = (e.target as HTMLInputElement).checked;
-    vistaInventario();
-  });
-  $("#inv-csv").addEventListener("click", () =>
-    descargarTexto("inventario-decants.csv", perfumesACsv(estado.perfumes, vols), "text/csv"),
-  );
-  $$<HTMLInputElement>(".tabla-inv input").forEach((inp) =>
-    inp.addEventListener("change", () => {
-      const p = estado.perfumes.find((x) => x.id === inp.dataset.id);
-      if (!p) return;
-      const n = Math.max(0, parseInt(inp.value, 10) || 0);
-      p.inventario[inp.dataset.v!] = n;
-      inp.value = String(n);
-      inp.classList.toggle("bajo", n <= umbral);
-      guardarPerfumes();
-    }),
-  );
-  $$("[data-deshacer]").forEach((b) =>
-    b.addEventListener("click", () => {
-      const h = estado.historial.find((x) => x.id === b.dataset.deshacer);
-      const p = estado.perfumes.find((x) => x.id === h?.perfumeId);
-      if (!h || !p) return;
-      p.inventario[h.volumen] = stock(p, h.volumen) + h.descontado;
-      h.descontado = 0;
-      guardarPerfumes();
-      guardarHistorial();
-      aviso("Stock restaurado");
-      vistaInventario();
-    }),
-  );
-  document.getElementById("hist-borrar")?.addEventListener("click", () => {
-    if (!confirm("¿Vaciar el historial de impresiones?")) return;
-    estado.historial = [];
-    guardarHistorial();
-    vistaInventario();
   });
 }
 
@@ -612,9 +467,8 @@ function vistaAjustes(): void {
     </section>
 
     <section class="tarjeta formulario">
-      <h2>Inventario</h2>
+      <h2>Volúmenes</h2>
       <label>Volúmenes en ml <small>(separados por coma)</small><input id="a-vols" value="${esc(a.volumenes.join(", "))}" /></label>
-      <label>Avisar stock bajo cuando quede<input id="a-bajo" type="number" min="0" value="${a.stockBajo}" inputmode="numeric" /></label>
     </section>
 
     <section class="tarjeta">
@@ -626,7 +480,7 @@ function vistaAjustes(): void {
         <button type="button" class="btn" id="d-csv-out">Exportar CSV</button>
         <button type="button" class="btn peligro" id="d-reset">Restaurar catálogo inicial</button>
       </div>
-      <p class="ayuda">CSV: columnas <code>nombre, marca, genero, nota, stock_3, stock_5…</code>. Los perfumes importados se agregan al catálogo.</p>
+      <p class="ayuda">CSV: columnas <code>nombre, marca, genero, nota</code>. Los perfumes importados se agregan al catálogo.</p>
     </section>`;
 
   const previa = $<HTMLCanvasElement>("#a-previa");
@@ -661,10 +515,6 @@ function vistaAjustes(): void {
     guardarAjustes();
     aviso("Volúmenes guardados");
   });
-  $<HTMLInputElement>("#a-bajo").addEventListener("change", (e) => {
-    a.stockBajo = Math.max(0, parseInt((e.target as HTMLInputElement).value, 10) || 0);
-    guardarAjustes();
-  });
 
   const subirLogo = async (alGuardar: (dataUrl: string) => void) => {
     const archivo = await leerArchivo("image/*");
@@ -698,7 +548,7 @@ function vistaAjustes(): void {
   $("#d-respaldo").addEventListener("click", () =>
     descargarTexto(
       `respaldo-decants-${new Date().toISOString().slice(0, 10)}.json`,
-      JSON.stringify({ version: 1, ...estado }, null, 2),
+      JSON.stringify({ version: 2, ...estado }, null, 2),
       "application/json",
     ),
   );
@@ -709,12 +559,9 @@ function vistaAjustes(): void {
       const datos = JSON.parse(await archivo.text());
       if (!Array.isArray(datos.perfumes)) throw new Error("El archivo no es un respaldo válido");
       if (!confirm(`Se reemplazará el catálogo actual por ${datos.perfumes.length} perfumes. ¿Continuar?`)) return;
-      estado.perfumes = datos.perfumes;
+      reemplazarPerfumes(datos.perfumes);
       estado.ajustes = { ...AJUSTES_DEFECTO, ...(datos.ajustes ?? {}) };
-      estado.historial = datos.historial ?? [];
-      guardarPerfumes();
       guardarAjustes();
-      guardarHistorial();
       aviso("Respaldo restaurado");
       vistaAjustes();
     } catch (e) {
@@ -737,10 +584,10 @@ function vistaAjustes(): void {
     }
   });
   $("#d-csv-out").addEventListener("click", () =>
-    descargarTexto("catalogo-decants.csv", perfumesACsv(estado.perfumes, a.volumenes), "text/csv"),
+    descargarTexto("catalogo-decants.csv", perfumesACsv(estado.perfumes), "text/csv"),
   );
   $("#d-reset").addEventListener("click", () => {
-    if (!confirm("Se reemplazará el catálogo (y su stock) por el catálogo inicial. ¿Continuar?")) return;
+    if (!confirm("Se reemplazará el catálogo por el catálogo inicial. ¿Continuar?")) return;
     estado.perfumes = catalogoPorDefecto();
     guardarPerfumes();
     aviso("Catálogo restaurado");

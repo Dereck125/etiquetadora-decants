@@ -38,10 +38,7 @@ function normalizarGenero(v: string): Genero {
   return exacto ?? "Unisex";
 }
 
-/**
- * Columnas reconocidas (encabezado obligatorio, en cualquier orden):
- * nombre, marca, genero, nota, y stock por volumen como "stock_5" o "5ml".
- */
+/** Columnas reconocidas (encabezado obligatorio, en cualquier orden): nombre, marca, genero, nota. */
 export function perfumesDesdeCsv(texto: string): Perfume[] {
   const [encabezado, ...filas] = parsearCsv(texto);
   if (!encabezado) return [];
@@ -49,29 +46,17 @@ export function perfumesDesdeCsv(texto: string): Perfume[] {
   const idx = (nombre: string) => cols.indexOf(nombre);
   const iNombre = idx("nombre"), iMarca = idx("marca"), iGenero = idx("genero"), iNota = idx("nota");
   if (iNombre < 0) throw new Error('El CSV necesita una columna "nombre"');
-  const volumenes = cols
-    .map((c, i) => ({ i, m: c.match(/^(?:stock[_ ]?)?(\d+(?:[.,]\d+)?)\s*(?:ml)?$/) }))
-    .filter((x) => x.m)
-    .map((x) => ({ i: x.i, vol: x.m![1].replace(",", ".") }));
 
   return filas
     .filter((f) => f[iNombre]?.trim())
-    .map((f) => {
-      const inventario: Record<string, number> = {};
-      for (const v of volumenes) {
-        const n = parseInt(f[v.i] ?? "", 10);
-        if (!isNaN(n)) inventario[v.vol] = n;
-      }
-      return {
-        id: nuevoId(),
-        nombre: f[iNombre].trim(),
-        marca: iMarca >= 0 ? (f[iMarca] ?? "").trim() : "",
-        genero: iGenero >= 0 ? normalizarGenero(f[iGenero] ?? "") : "Unisex",
-        nota: iNota >= 0 ? (f[iNota] ?? "").trim() : "",
-        inventario,
-        activo: true,
-      };
-    });
+    .map((f) => ({
+      id: nuevoId(),
+      nombre: f[iNombre].trim(),
+      marca: iMarca >= 0 ? (f[iMarca] ?? "").trim() : "",
+      genero: iGenero >= 0 ? normalizarGenero(f[iGenero] ?? "") : "Unisex",
+      nota: iNota >= 0 ? (f[iNota] ?? "").trim() : "",
+      activo: true,
+    }));
 }
 
 function celda(v: string | number): string {
@@ -79,12 +64,9 @@ function celda(v: string | number): string {
   return /[",;\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
 }
 
-export function perfumesACsv(perfumes: Perfume[], volumenes: number[]): string {
-  const encabezado = ["nombre", "marca", "genero", "nota", ...volumenes.map((v) => `stock_${v}`)];
-  const filas = perfumes.map((p) => [
-    p.nombre, p.marca, p.genero, p.nota,
-    ...volumenes.map((v) => p.inventario[String(v)] ?? 0),
-  ]);
+export function perfumesACsv(perfumes: Perfume[]): string {
+  const encabezado = ["nombre", "marca", "genero", "nota"];
+  const filas = perfumes.map((p) => [p.nombre, p.marca, p.genero, p.nota]);
   return "\uFEFF" + [encabezado, ...filas].map((f) => f.map(celda).join(",")).join("\r\n") + "\r\n";
 }
 

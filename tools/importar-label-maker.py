@@ -31,7 +31,6 @@ for id_, nombre, marca, genero in filas:
         "marca": MARCA_FIX.get(marca, marca or "").strip(),
         "genero": GENERO.get(genero, "Unisex"),
         "nota": ", ".join(notas),
-        "inventario": {},
         "activo": True,
     })
 
