@@ -1,13 +1,23 @@
 {
   "name": "etiquetadora-decants",
   "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
+  "description": "Etiquetadora de decants para Niimbot D11 (Web Bluetooth)",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
-  "type": "commonjs"
+  "type": "module",
+  "dependencies": {
+    "@fontsource/roboto-condensed": "^5.3.0",
+    "@mmote/niimbluelib": "0.47.0"
+  },
+  "devDependencies": {
+    "sharp": "^0.35.5",
+    "typescript": "^7.0.2",
+    "vite": "^8.3.2"
+  }
 }

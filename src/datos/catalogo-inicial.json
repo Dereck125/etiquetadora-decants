@@ -1,0 +1,533 @@
+[
+  {
+    "id": "lm-57",
+    "nombre": "9 AM DIVE",
+    "marca": "Afnan",
+    "genero": "Caballero",
+    "nota": "azul",
+    "inventario": {},
+    "activo": true
+  },
+  {
+    "id": "lm-33",
+    "nombre": "9 PM",
+    "marca": "Afnan",
+    "genero": "Caballero",
+    "nota": "NEGRO",
+    "inventario": {},
+    "activo": true
+  },
+  {
+    "id": "lm-34",
+    "nombre": "9 pm Rebel",
+    "marca": "Afnan",
+    "genero": "Unisex",
+    "nota": "ROJO",
+    "inventario": {},
+    "activo": true
+  },
+  {
+    "id": "lm-27",
+    "nombre": "Mystique Bouquet",
+    "marca": "Afnan",
+    "genero": "Dama",
+    "nota": "",
+    "inventario": {},
+    "activo": true
+  },
+  {
+    "id": "lm-37",
+    "nombre": "AL HARAMIN Aqua Dibai",
+    "marca": "Al Haramain Perfumes",
+    "genero": "Unisex",
+    "nota": "",
+    "inventario": {},
+    "activo": true
+  },
+  {
+    "id": "lm-39",
+    "nombre": "Ariana Grande Cloud",
+    "marca": "Ariana Grande",
+    "genero": "Dama",
+    "nota": "",
+    "inventario": {},
+    "activo": true
+  },
+  {
+    "id": "lm-30",
+    "nombre": "CDN IMPERIALE",
+    "marca": "Armaf",
+    "genero": "Dama",
+    "nota": "",
+    "inventario": {},
+    "activo": true
+  },
+  {
+    "id": "lm-46",
+    "nombre": "CDN Woman",
+    "marca": "Armaf",
+    "genero": "Dama",
+    "nota": "",
+    "inventario": {},
+    "activo": true
+  },
+  {
+    "id": "lm-62",
+    "nombre": "MANDARIN SKY",
+    "marca": "Armaf",
+    "genero": "Caballero",
+    "nota": "",
+    "inventario": {},
+    "activo": true
+  },
+  {
+    "id": "lm-25",
+    "nombre": "ODYSSEY MEGA",
+    "marca": "Armaf",
+    "genero": "Caballero",
+    "nota": "",
+    "inventario": {},
+    "activo": true
+  },
+  {
+    "id": "lm-48",
+    "nombre": "AZZARO Wanted EDT",
+    "marca": "Azzaro",
+    "genero": "Caballero",
+    "nota": "",
+    "inventario": {},
+    "activo": true
+  },
+  {
+    "id": "lm-3",
+    "nombre": "212 VIP BLACK",
+    "marca": "Carolina Herrera",
+    "genero": "Caballero",
+    "nota": "",
+    "inventario": {},
+    "activo": true
+  },
+  {
+    "id": "lm-4",
+    "nombre": "212 VIP ROSE",
+    "marca": "Carolina Herrera",
+    "genero": "Dama",
+    "nota": "",
+    "inventario": {},
+    "activo": true
+  },
+  {
+    "id": "lm-8",
+    "nombre": "BAD BOY COBALT ELIXIR",
+    "marca": "Carolina Herrera",
+    "genero": "Caballero",
+    "nota": "AZUL",
+    "inventario": {},
+    "activo": true
+  },
+  {
+    "id": "lm-7",
+    "nombre": "BAD BOY EDT",
+    "marca": "Carolina Herrera",
+    "genero": "Caballero",
+    "nota": "DORADO Y NEGRO",
+    "inventario": {},
+    "activo": true
+  },
+  {
+    "id": "lm-5",
+    "nombre": "CH GOOD GIRL",
+    "marca": "Carolina Herrera",
+    "genero": "Dama",
+    "nota": "",
+    "inventario": {},
+    "activo": true
+  },
+  {
+    "id": "lm-16",
+    "nombre": "CH Very Good Girl",
+    "marca": "Carolina Herrera",
+    "genero": "Dama",
+    "nota": "",
+    "inventario": {},
+    "activo": true
+  },
+  {
+    "id": "lm-22",
+    "nombre": "MISS DIOR",
+    "marca": "Dior",
+    "genero": "Dama",
+    "nota": "",
+    "inventario": {},
+    "activo": true
+  },
+  {
+    "id": "lm-59",
+    "nombre": "SAUVAGE EDP",
+    "marca": "Dior",
+    "genero": "Caballero",
+    "nota": "",
+    "inventario": {},
+    "activo": true
+  },
+  {
+    "id": "lm-35",
+    "nombre": "SAUVAGE EDT",
+    "marca": "Dior",
+    "genero": "Caballero",
+    "nota": "",
+    "inventario": {},
+    "activo": true
+  },
+  {
+    "id": "lm-13",
+    "nombre": "D&G Light Blue",
+    "marca": "Dolce&Gabbana",
+    "genero": "Dama",
+    "nota": "",
+    "inventario": {},
+    "activo": true
+  },
+  {
+    "id": "lm-51",
+    "nombre": "Stallion 53",
+    "marca": "Emper",
+    "genero": "Caballero",
+    "nota": "",
+    "inventario": {},
+    "activo": true
+  },
+  {
+    "id": "lm-61",
+    "nombre": "OFFICE FOR MEN",
+    "marca": "Fragrance One",
+    "genero": "Caballero",
+    "nota": "",
+    "inventario": {},
+    "activo": true
+  },
+  {
+    "id": "lm-6",
+    "nombre": "AQUA DI GIO PARFUM",
+    "marca": "Giorgio Armani",
+    "genero": "Caballero",
+    "nota": "NEGRO",
+    "inventario": {},
+    "activo": true
+  },
+  {
+    "id": "lm-55",
+    "nombre": "Aqua DI Gio Profondo",
+    "marca": "Giorgio Armani",
+    "genero": "Caballero",
+    "nota": "Azul",
+    "inventario": {},
+    "activo": true
+  },
+  {
+    "id": "lm-50",
+    "nombre": "Aqua Di Gio EDT",
+    "marca": "Giorgio Armani",
+    "genero": "Caballero",
+    "nota": "BLANCO",
+    "inventario": {},
+    "activo": true
+  },
+  {
+    "id": "lm-32",
+    "nombre": "Aqua Di Gioia",
+    "marca": "Giorgio Armani",
+    "genero": "Dama",
+    "nota": "",
+    "inventario": {},
+    "activo": true
+  },
+  {
+    "id": "lm-15",
+    "nombre": "Stronger With You intesely",
+    "marca": "Giorgio Armani",
+    "genero": "Caballero",
+    "nota": "",
+    "inventario": {},
+    "activo": true
+  },
+  {
+    "id": "lm-24",
+    "nombre": "JPG LE MALE ELIXIR",
+    "marca": "Jean Paul Gaultier",
+    "genero": "Caballero",
+    "nota": "",
+    "inventario": {},
+    "activo": true
+  },
+  {
+    "id": "lm-31",
+    "nombre": "JPG LE MALE LE PARFUM",
+    "marca": "Jean Paul Gaultier",
+    "genero": "Caballero",
+    "nota": "NEGRO",
+    "inventario": {},
+    "activo": true
+  },
+  {
+    "id": "lm-12",
+    "nombre": "JPG Paradise Garden",
+    "marca": "Jean Paul Gaultier",
+    "genero": "Caballero",
+    "nota": "",
+    "inventario": {},
+    "activo": true
+  },
+  {
+    "id": "lm-11",
+    "nombre": "La Vie Est Belle",
+    "marca": "Lancôme",
+    "genero": "Dama",
+    "nota": "",
+    "inventario": {},
+    "activo": true
+  },
+  {
+    "id": "lm-18",
+    "nombre": "ASAD",
+    "marca": "Lattafa Perfumes",
+    "genero": "Caballero",
+    "nota": "",
+    "inventario": {},
+    "activo": true
+  },
+  {
+    "id": "lm-10",
+    "nombre": "Khamrah Qahwa",
+    "marca": "Lattafa Perfumes",
+    "genero": "Unisex",
+    "nota": "",
+    "inventario": {},
+    "activo": true
+  },
+  {
+    "id": "lm-17",
+    "nombre": "yara edp",
+    "marca": "Lattafa Perfumes",
+    "genero": "Dama",
+    "nota": "",
+    "inventario": {},
+    "activo": true
+  },
+  {
+    "id": "lm-2",
+    "nombre": "Jean Lowe Immortel",
+    "marca": "Maison Alhambra",
+    "genero": "Caballero",
+    "nota": "",
+    "inventario": {},
+    "activo": true
+  },
+  {
+    "id": "lm-43",
+    "nombre": "SALVO",
+    "marca": "Maison Alhambra",
+    "genero": "Caballero",
+    "nota": "",
+    "inventario": {},
+    "activo": true
+  },
+  {
+    "id": "lm-29",
+    "nombre": "NAUTICA VOYAGE",
+    "marca": "Nautica",
+    "genero": "Caballero",
+    "nota": "",
+    "inventario": {},
+    "activo": true
+  },
+  {
+    "id": "lm-60",
+    "nombre": "PRADA LHOMME EDT",
+    "marca": "Prada",
+    "genero": "Caballero",
+    "nota": "",
+    "inventario": {},
+    "activo": true
+  },
+  {
+    "id": "lm-52",
+    "nombre": "Rave Pink",
+    "marca": "RAVE",
+    "genero": "Dama",
+    "nota": "",
+    "inventario": {},
+    "activo": true
+  },
+  {
+    "id": "lm-49",
+    "nombre": "Invictus Parfum",
+    "marca": "Rabanne",
+    "genero": "Caballero",
+    "nota": "",
+    "inventario": {},
+    "activo": true
+  },
+  {
+    "id": "lm-28",
+    "nombre": "Hawas Fire",
+    "marca": "Rasasi",
+    "genero": "Caballero",
+    "nota": "",
+    "inventario": {},
+    "activo": true
+  },
+  {
+    "id": "lm-45",
+    "nombre": "Hawas Ice",
+    "marca": "Rasasi",
+    "genero": "Caballero",
+    "nota": "",
+    "inventario": {},
+    "activo": true
+  },
+  {
+    "id": "lm-41",
+    "nombre": "Hawas Malibu",
+    "marca": "Rasasi",
+    "genero": "Caballero",
+    "nota": "verde oscuro",
+    "inventario": {},
+    "activo": true
+  },
+  {
+    "id": "lm-36",
+    "nombre": "Hawas Pink",
+    "marca": "Rasasi",
+    "genero": "Dama",
+    "nota": "",
+    "inventario": {},
+    "activo": true
+  },
+  {
+    "id": "lm-42",
+    "nombre": "Hawas Tropical",
+    "marca": "Rasasi",
+    "genero": "Caballero",
+    "nota": "verde claro",
+    "inventario": {},
+    "activo": true
+  },
+  {
+    "id": "lm-38",
+    "nombre": "Hawas for him",
+    "marca": "Rasasi",
+    "genero": "Caballero",
+    "nota": "MORADO",
+    "inventario": {},
+    "activo": true
+  },
+  {
+    "id": "lm-26",
+    "nombre": "OCEAN RUSH",
+    "marca": "Rayhaan",
+    "genero": "Caballero",
+    "nota": "",
+    "inventario": {},
+    "activo": true
+  },
+  {
+    "id": "lm-44",
+    "nombre": "Pacific AURA",
+    "marca": "Rayhaan",
+    "genero": "Caballero",
+    "nota": "",
+    "inventario": {},
+    "activo": true
+  },
+  {
+    "id": "lm-56",
+    "nombre": "RAYHAAN AQUATICA",
+    "marca": "Rayhaan",
+    "genero": "Caballero",
+    "nota": "",
+    "inventario": {},
+    "activo": true
+  },
+  {
+    "id": "lm-58",
+    "nombre": "RAYHAAN IMPERIA INTENSE",
+    "marca": "Rayhaan",
+    "genero": "Caballero",
+    "nota": "",
+    "inventario": {},
+    "activo": true
+  },
+  {
+    "id": "lm-19",
+    "nombre": "Born in Roma Intense",
+    "marca": "Valentino",
+    "genero": "Caballero",
+    "nota": "",
+    "inventario": {},
+    "activo": true
+  },
+  {
+    "id": "lm-54",
+    "nombre": "Valentino Coral Fantasy",
+    "marca": "Valentino",
+    "genero": "Caballero",
+    "nota": "B",
+    "inventario": {},
+    "activo": true
+  },
+  {
+    "id": "lm-53",
+    "nombre": "VERSACE DYLAN BLUE",
+    "marca": "Versace",
+    "genero": "Caballero",
+    "nota": "",
+    "inventario": {},
+    "activo": true
+  },
+  {
+    "id": "lm-23",
+    "nombre": "VERSACE EROS EDP",
+    "marca": "Versace",
+    "genero": "Caballero",
+    "nota": "",
+    "inventario": {},
+    "activo": true
+  },
+  {
+    "id": "lm-9",
+    "nombre": "Versace Bright Crystal",
+    "marca": "Versace",
+    "genero": "Dama",
+    "nota": "rosa",
+    "inventario": {},
+    "activo": true
+  },
+  {
+    "id": "lm-21",
+    "nombre": "Versace Eros Pour Femme",
+    "marca": "Versace",
+    "genero": "Dama",
+    "nota": "",
+    "inventario": {},
+    "activo": true
+  },
+  {
+    "id": "lm-40",
+    "nombre": "Versace Pour Homme",
+    "marca": "Versace",
+    "genero": "Caballero",
+    "nota": "azul calro",
+    "inventario": {},
+    "activo": true
+  },
+  {
+    "id": "lm-47",
+    "nombre": "YSL Libre",
+    "marca": "Yves Saint Laurent",
+    "genero": "Dama",
+    "nota": "",
+    "inventario": {},
+    "activo": true
+  }
+]
