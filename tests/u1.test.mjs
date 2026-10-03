@@ -68,7 +68,7 @@ function lienzoFalso(alto) {
 }
 
 test("Trabajo completo: encabezado, líneas y avance hasta el hueco", () => {
-  const t = Buffer.from(trabajoU1(lienzoFalso(2), { ...OPCIONES_U1_DEFECTO, densidad: 3, avance: "hueco", avanceMm: 25 }));
+  const t = Buffer.from(trabajoU1(lienzoFalso(2), { ...OPCIONES_U1_DEFECTO, densidad: 3, avance: "hueco", avanceMm: 25, extraMm: 0 }));
   const inicio = [
     paquete(0xbd, [10]),
     paquete(0xa4, [0x33]),
@@ -85,10 +85,10 @@ test("Trabajo completo: encabezado, líneas y avance hasta el hueco", () => {
   assert.ok(!t.includes(Buffer.from(paquete(0xbd, [0]))), "nunca BD 0: la impresora no movería el papel");
 });
 
-test("Retroceso: 5 mm fijos (back_paper_num 40); el avance extra solo suma si se usó", () => {
-  assert.equal(retrocesoU1(OPCIONES_U1_DEFECTO, false), 5);
-  assert.equal(retrocesoU1(OPCIONES_U1_DEFECTO, true), 5, "sin avance extra por defecto");
-  assert.equal(retrocesoU1({ ...OPCIONES_U1_DEFECTO, extraMm: 3 }, true), 8);
+test("Retroceso: inicio calibrado (3 mm) + avance extra de la etiqueta anterior (6 mm)", () => {
+  assert.equal(retrocesoU1(OPCIONES_U1_DEFECTO, false), 3);
+  assert.equal(retrocesoU1(OPCIONES_U1_DEFECTO, true), 9);
+  assert.equal(retrocesoU1({ ...OPCIONES_U1_DEFECTO, extraMm: 0 }, true), 3);
   assert.equal(retrocesoU1({ ...OPCIONES_U1_DEFECTO, avance: "fijo" }, true), 0);
   const t = Buffer.from(trabajoU1(lienzoFalso(1), OPCIONES_U1_DEFECTO, 5));
   const bd = Buffer.from(paquete(0xbd, [10]));
