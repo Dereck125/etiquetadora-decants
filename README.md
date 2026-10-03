@@ -74,9 +74,22 @@ python tools/importar-label-maker.py "D:\label-maker\labels.db"
 
 Lo que está entre paréntesis en el nombre (p. ej. "(azul)") pasa al campo `nota` y no se imprime.
 
+## Publicación
+
+GitHub Pages publica las dos ramas en cada push a `master` o `develop` (`.github/workflows/pages.yml`):
+
+| Dirección | Rama | Uso |
+|---|---|---|
+| https://dereck125.github.io/etiquetadora-decants/ | `master` | Estable: el link que se comparte |
+| https://dereck125.github.io/etiquetadora-decants/dev/ | `develop` | Pruebas (muestra la insignia "Pruebas") |
+
+Cada versión guarda su catálogo y ajustes por separado en el navegador (prefijo `etq.` / `etq-dev.`) y tiene
+su propio service worker, así que probar en `/dev/` no afecta a quien imprime con la estable.
+Para compilar localmente la versión de pruebas: `VITE_CANAL=dev npm run build`.
+
 ## Flujo de ramas
 
-- `master`: versiones estables / producción.
+- `master`: versiones estables / producción (entra por Pull Request desde `develop`).
 - `develop`: integración.
 - `feature/*`: cada cambio nace de `develop` y vuelve a `develop` por merge.
 
