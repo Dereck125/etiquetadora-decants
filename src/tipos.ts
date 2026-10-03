@@ -31,6 +31,8 @@ export interface Ajustes {
   volumenesCortos: number[];
   /** Largo impreso en mm (la etiqueta mide 40). Por debajo de 40 para no invadir la etiqueta siguiente. */
   largoMm: number;
+  /** Espacio en blanco arriba del diseño, en mm, para centrarlo en la etiqueta. */
+  margenSuperiorMm: number;
   resolucion: Resolucion;
   /** Pausa entre paquetes Bluetooth en ms (10 = seguro, 0 = lo más rápido). */
   pausaEnvioMs: number;
