@@ -564,7 +564,11 @@ function seccionU1(): string {
             <div class="u1-grid">
               <label>Borde izquierdo<input type="number" id="cal-izq" step="0.5" inputmode="decimal" placeholder="p. ej. 8" /></label>
               <label>Borde derecho<input type="number" id="cal-der" step="0.5" inputmode="decimal" placeholder="p. ej. 48" /></label>
-              <label>Borde de arriba <small>(regla vertical)</small><input type="number" id="cal-arriba" step="0.5" inputmode="decimal" placeholder="p. ej. -2" /></label>
+              <label>Borde de arriba <small>(regla vertical)</small><select id="cal-arriba">
+                ${Array.from({ length: 33 }, (_, i) => (i - 16) / 2)
+                  .map((v) => `<option value="${v}" ${v === 0 ? "selected" : ""}>${v > 0 ? "+" : v < 0 ? "−" : ""}${Math.abs(v).toLocaleString("es")}</option>`)
+                  .join("")}
+              </select></label>
             </div>
             <button type="button" class="btn primario" id="cal-aplicar">Aplicar calibración</button>
             <p class="ayuda" id="cal-resultado"></p></li>
@@ -660,9 +664,10 @@ function enlazarU1(): void {
     imprimirU1(e.currentTarget as HTMLButtonElement, async () => lienzoGuiaU1(o.altoMm), GUIA_PREVIA_MM),
   );
   $("#cal-aplicar").addEventListener("click", () => {
-    const leer = (id: string) => Number(($(`#${id}`) as HTMLInputElement).value.replace(",", "."));
+    // El borde de arriba es un <select> (el teclado numérico de Android no tiene signo menos).
+    const leer = (id: string) => Number(($(`#${id}`) as HTMLInputElement | HTMLSelectElement).value.replace(",", "."));
     const izq = leer("cal-izq"), der = leer("cal-der"), arriba = leer("cal-arriba");
-    const crudo = ["cal-izq", "cal-der", "cal-arriba"].map((id) => ($(`#${id}`) as HTMLInputElement).value.trim());
+    const crudo = ["cal-izq", "cal-der"].map((id) => ($(`#${id}`) as HTMLInputElement).value.trim());
     if (crudo.some((v) => v === "") || [izq, der, arriba].some((n) => Number.isNaN(n))) {
       return aviso("Escribe los tres números que leíste en la guía", "error");
     }
