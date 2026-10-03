@@ -48,6 +48,11 @@ export function largoImpresionMm(volumen: string, ajustes: Ajustes): number {
   return Math.min(MM_LARGO, Math.max(30, ajustes.largoMm));
 }
 
+/** Margen superior en mm, limitado para que el diseño no quede demasiado pequeño. */
+export function margenSuperiorMm(ajustes: Ajustes): number {
+  return Math.min(4, Math.max(0, ajustes.margenSuperiorMm));
+}
+
 export function esCorta(volumen: string, ajustes: Ajustes): boolean {
   return ajustes.volumenesCortos.map(String).includes(volumen.trim());
 }
@@ -246,21 +251,29 @@ export async function renderizarEtiqueta(
   const par = corta && pareja ? pareja : null;
   const largoMm = par ? largoImpresionMm("", ajustes) : largoImpresionMm(datos.volumen, ajustes);
   const { ancho, largo } = dimensiones(ajustes.resolucion, largoMm);
-  /** Largo en la cuadrícula base: 304 para 38 mm, 160 para la corta. */
-  const L = Math.round(largoMm * BASE_PX_MM);
+  /** Largo de la imagen en la cuadrícula base: 304 para 38 mm, 160 para la corta. */
+  const Limagen = Math.round(largoMm * BASE_PX_MM);
+  /**
+   * Margen en blanco arriba: la impresora empieza justo en el borde de la etiqueta, así que el diseño
+   * se baja para que quede centrado (con 38 mm de impresión, 2 mm arriba y 2 mm abajo). No alarga la imagen.
+   */
+  const margen = Math.round(margenSuperiorMm(ajustes) * BASE_PX_MM);
+  /** Largo del diseño (lo que va dentro del marco). */
+  const L = Limagen - margen;
   const c = document.createElement("canvas");
   c.width = ancho;
   c.height = largo;
   const ctx = c.getContext("2d", { willReadFrequently: true })!;
   ctx.fillStyle = "#fff";
   ctx.fillRect(0, 0, ancho, largo);
-  ctx.scale(ancho / BASE_ANCHO, largo / L);
+  ctx.scale(ancho / BASE_ANCHO, largo / Limagen);
+  ctx.translate(0, margen);
 
   const nombre = (d: DatosEtiqueta) => (ajustes.mayusculas ? d.nombre.toUpperCase() : d.nombre);
   const logos = await cargarLogos(datos.marca);
 
   if (par) {
-    const Lpar = Math.round(((largoMm - MM_SEPARACION_PAR) / 2) * BASE_PX_MM);
+    const Lpar = Math.round((L - MM_SEPARACION_PAR * BASE_PX_MM) / 2);
     dibujarCorta(ctx, nombre(datos), datos.marca, logos, Lpar, ajustes.marco);
     lineaCorte(ctx, L / 2);
     const logosPar = await cargarLogos(par.marca);

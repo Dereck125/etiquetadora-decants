@@ -532,6 +532,12 @@ function vistaAjustes(): void {
           </select>
           <small>Si después de cada etiqueta sale otra en blanco, baja este valor.</small>
         </label>
+        <label>Margen superior <small>(para centrar el diseño)</small>
+          <select id="a-margen">
+            ${[0, 0.5, 1, 1.5, 2, 2.5, 3].map((mm) => `<option value="${mm}" ${mm === a.margenSuperiorMm ? "selected" : ""}>${mm.toLocaleString("es")} mm${mm === 2 ? " (centrado)" : ""}</option>`).join("")}
+          </select>
+          <small>Abajo quedan ${(40 - a.largoMm).toLocaleString("es")} mm sin imprimir. Si sale muy arriba, súbelo; si sale muy abajo, bájalo.</small>
+        </label>
         <label>Etiqueta corta (media etiqueta) para <small>(ml, separados por coma)</small>
           <input id="a-cortos" value="${esc(a.volumenesCortos.join(", "))}" placeholder="Ninguno" />
         </label>
@@ -621,6 +627,11 @@ function vistaAjustes(): void {
   });
   $<HTMLSelectElement>("#a-largo").addEventListener("change", (e) => {
     a.largoMm = Number((e.target as HTMLSelectElement).value);
+    guardarAjustes();
+    vistaAjustes();
+  });
+  $<HTMLSelectElement>("#a-margen").addEventListener("change", (e) => {
+    a.margenSuperiorMm = Number((e.target as HTMLSelectElement).value);
     guardarAjustes();
     repintar();
   });
