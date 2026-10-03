@@ -323,15 +323,16 @@ class ImpresoraU1 {
 export const u1 = new ImpresoraU1();
 
 /**
- * Coloca una etiqueta ya dibujada en los 384 puntos del cabezal según la calibración. Si la etiqueta
- * se sale del área imprimible (en la U1 calibrada, ~1.5 mm a la derecha), devuelve cuánto hay que
- * encoger el diseño para dejar el mismo margen a los dos lados.
+ * Parte de la etiqueta que el cabezal alcanza a imprimir, según la calibración. Si la etiqueta se
+ * sale de los 384 puntos (en la U1 calibrada, ~1.5 mm a la derecha) solo se recorta ese lado: el
+ * otro aprovecha la etiqueta hasta su borde.
  */
 export function areaImprimibleU1(anchoMm: number, desplazamiento: number) {
   const w = Math.round(anchoMm * U1_PX_MM);
   const x0 = Math.round((U1_ANCHO - w) / 2) + desplazamiento;
-  const sobra = Math.max(0, x0 + w - U1_ANCHO, -x0);
-  return { x: x0 + sobra, ancho: w - 2 * sobra };
+  const izq = Math.max(0, x0);
+  const der = Math.min(U1_ANCHO, x0 + w);
+  return { x: izq, ancho: der - izq };
 }
 
 export function lienzoEtiquetaU1(etiqueta: HTMLCanvasElement, x: number): HTMLCanvasElement {
