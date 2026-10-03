@@ -203,7 +203,9 @@ const hex = (d: DataView) =>
  */
 export function retrocesoU1(o: OpcionesU1, anteriorAdelantada: boolean): number {
   if (o.avance !== "hueco") return 0;
-  return Math.max(0, o.inicioMm) + (anteriorAdelantada ? Math.max(0, o.extraMm) : 0);
+  // inicioMm puede ser negativo: con avance extra, el retroceso de esa distancia se pasa un poco y
+  // hay que retroceder menos que el avance (en la U1 del usuario, con 6 mm, aun con inicio 0 se cortaba).
+  return Math.max(0, o.inicioMm + (anteriorAdelantada ? Math.max(0, o.extraMm) : 0));
 }
 
 /** Recuerda (aunque se cierre la app) si la última etiqueta quedó adelantada para arrancarla. */
@@ -407,7 +409,7 @@ export function calcularCalibracionU1(o: OpcionesU1, izq: number, der: number, a
   const centroMm = (izq + der) / 2;
   return {
     desplazamiento: Math.round(centroMm * U1_PX_MM - U1_ANCHO / 2),
-    inicioMm: Math.max(0, Math.round((o.inicioMm - arriba) * 2) / 2),
+    inicioMm: Math.max(-8, Math.min(15, Math.round((o.inicioMm - arriba) * 2) / 2)),
     anchoMedidoMm: Math.round((der - izq) * 10) / 10,
   };
 }

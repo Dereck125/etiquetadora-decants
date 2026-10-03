@@ -617,7 +617,12 @@ function seccionU1(): string {
         <label>Modo BE<select data-u1="modoBE">${opc([0, 1], o.modoBE, (v) => (Number(v) === 0 ? "0 (imagen)" : "1 (texto/etiqueta)"))}</select></label>
         <label>Bloque BLE<select data-u1="bloque">${opc([20, 100, 180], o.bloque, (v) => `${v} bytes`)}</select></label>
         <label>Avance para arrancar (mm)<input type="number" data-u1="extraMm" value="${o.extraMm}" min="0" max="20" step="0.5" /></label>
-        <label>Corrección de inicio (mm)<input type="number" data-u1="inicioMm" value="${o.inicioMm}" min="0" max="15" step="0.5" /></label>
+        <label>Corrección de inicio (mm) <small>(menos = la impresión baja)</small><select data-u1="inicioMm">${opc(
+          // Lista (el teclado numérico de Android no tiene signo menos); incluye siempre el valor actual.
+          [...new Set([...Array.from({ length: 47 }, (_, i) => (i - 16) / 2), o.inicioMm])].sort((a, b) => a - b),
+          o.inicioMm,
+          (v) => `${Number(v) > 0 ? "+" : Number(v) < 0 ? "−" : ""}${Math.abs(Number(v)).toLocaleString("es")}`,
+        )}</select></label>
       </div>
       </details>
       <figure class="vista-previa"><canvas id="u1-previa" class="u1-previa"></canvas><figcaption>Vista previa (384 puntos de ancho)</figcaption></figure>
