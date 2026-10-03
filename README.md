@@ -33,7 +33,10 @@ Web Bluetooth solo funciona en `localhost` o con HTTPS. Para usarla desde el cel
 - **Resolución automática**: al conectar, la app lee el modelo y ajusta la imagen a su cabezal
   (D11: 203 DPI → 96 × 320 px; D11-H / D11 Pro: 300 DPI → 142 × 472 px). También se puede elegir en Ajustes.
 - **Etiqueta corta** (por defecto 3 ml): el frasco solo cubre media etiqueta, así que el diseño ocupa la mitad
-  superior (solo se envían 12 × 20 mm) sin el volumen. Los volúmenes se configuran en Ajustes.
+  superior (solo se envían 12 × 20 mm) sin el volumen.
+- **2 en 1** (solo etiquetas cortas): en el panel de impresión, con 3 ml, se puede elegir una segunda etiqueta
+  (otro perfume, de cualquier marca, o el mismo). Se imprimen las dos en una etiqueta de 40 mm, una debajo de la
+  otra, con una línea punteada para cortar; en total ocupan el largo de impresión configurado (38 mm). Los volúmenes se configuran en Ajustes.
 - **Largo de impresión** (por defecto 38 mm): la imagen debe quedar un poco más corta que la etiqueta de 40 mm.
   Si llega al borde, la impresión se pasa al hueco y la impresora expulsa otra etiqueta en blanco. Si aun así
   sale una en blanco, bájalo en Ajustes.
