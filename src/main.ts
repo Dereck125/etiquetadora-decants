@@ -15,7 +15,14 @@ import {
 } from "./almacen";
 import { descargarTexto, perfumesACsv, perfumesDesdeCsv } from "./csv";
 import { diagnosticarBle, diagnosticarSerie } from "./diagnostico";
-import { lienzoPruebaU1, lienzoReglaU1, u1 } from "./u1";
+import {
+  GUIA_PREVIA_MM,
+  calcularCalibracionU1,
+  lienzoGuiaU1,
+  lienzoPruebaU1,
+  lienzoReglaU1,
+  u1,
+} from "./u1";
 import { CANAL, PREFIJO } from "./entorno";
 import { esCorta, lienzoImpresion, renderizarEtiqueta } from "./etiqueta";
 import {
@@ -543,6 +550,31 @@ function seccionU1(): string {
         <button type="button" class="btn" id="u1-regla">Imprimir regla</button>
       </div>
       <p class="progreso" id="u1-progreso"></p>
+      <div class="calibrador">
+        <h3>Calibrar paso a paso</h3>
+        <ol>
+          <li>Pon el rollo derecho y con las guías ajustadas. Conecta la U1.</li>
+          <li><button type="button" class="btn" id="cal-guia">Imprimir guía de calibración</button>
+            <small>Sale una regla horizontal (números = mm) y una vertical (marcas cada mm).</small></li>
+          <li>En la etiqueta impresa, lee qué número queda justo en cada borde. Cada rayita es 1 mm: si el borde
+            cae 2 rayitas después del 5, escribe 7. Puedes usar medios (7.5).
+            <div class="u1-grid">
+              <label>Borde izquierdo<input type="number" id="cal-izq" step="0.5" inputmode="decimal" placeholder="p. ej. 8" /></label>
+              <label>Borde derecho<input type="number" id="cal-der" step="0.5" inputmode="decimal" placeholder="p. ej. 48" /></label>
+              <label>Borde de arriba <small>(regla vertical)</small><input type="number" id="cal-arriba" step="0.5" inputmode="decimal" placeholder="p. ej. -2" /></label>
+            </div>
+            <button type="button" class="btn primario" id="cal-aplicar">Aplicar calibración</button>
+            <p class="ayuda" id="cal-resultado"></p></li>
+          <li>Imprime la <b>prueba</b> (botón de arriba): el marco debe caer en el borde de la etiqueta.</li>
+          <li>Al terminar, ¿pudiste arrancarla sin jalar?
+            <div class="acciones-sec envolver">
+              <button type="button" class="btn" id="cal-falta">Le faltó papel (+1 mm)</button>
+              <button type="button" class="btn" id="cal-sobra">Salió de más (−1 mm)</button>
+            </div></li>
+        </ol>
+      </div>
+      <details class="u1-avanzado">
+      <summary>Ajustes manuales</summary>
       <div class="u1-grid">
         <label>Ancho (mm)<input type="number" data-u1="anchoMm" value="${o.anchoMm}" min="15" max="48" /></label>
         <label>Alto (mm)<input type="number" data-u1="altoMm" value="${o.altoMm}" min="10" max="100" /></label>
@@ -555,6 +587,7 @@ function seccionU1(): string {
         <label>Avance para arrancar (mm)<input type="number" data-u1="extraMm" value="${o.extraMm}" min="0" max="20" step="0.5" /></label>
         <label>Corrección de inicio (mm)<input type="number" data-u1="inicioMm" value="${o.inicioMm}" min="0" max="15" step="0.5" /></label>
       </div>
+      </details>
       <figure class="vista-previa"><canvas id="u1-previa" class="u1-previa"></canvas><figcaption>Vista previa (384 puntos de ancho)</figcaption></figure>
       <pre class="diag-salida" id="u1-avisos">${esc(u1.avisos.join("\n") || "Avisos de la impresora: —")}</pre>
     </section>`;
@@ -595,12 +628,12 @@ function enlazarU1(): void {
       aviso(mensajeError(err), "error");
     }
   });
-  const imprimirU1 = async (btn: HTMLButtonElement, lienzo: () => Promise<HTMLCanvasElement>) => {
+  const imprimirU1 = async (btn: HTMLButtonElement, lienzo: () => Promise<HTMLCanvasElement>, retrocesoExtra = 0) => {
     const progreso = $("#u1-progreso");
     btn.disabled = true;
     try {
       const inicio = performance.now();
-      await u1.imprimir(await lienzo(), 1, o, (t) => (progreso.textContent = t));
+      await u1.imprimir(await lienzo(), 1, o, (t) => (progreso.textContent = t), retrocesoExtra);
       aviso(`Prueba enviada a la U1 en ${((performance.now() - inicio) / 1000).toFixed(1)} s`);
       $("#u1-conectar").textContent = `Conectada: ${u1.nombre}`;
     } catch (err) {
@@ -618,6 +651,42 @@ function enlazarU1(): void {
   $("#u1-regla").addEventListener("click", (e) =>
     imprimirU1(e.currentTarget as HTMLButtonElement, async () => lienzoReglaU1(o.altoMm)),
   );
+
+  // ----- calibrador -----
+  $("#cal-guia").addEventListener("click", (e) =>
+    imprimirU1(e.currentTarget as HTMLButtonElement, async () => lienzoGuiaU1(o.altoMm), GUIA_PREVIA_MM),
+  );
+  $("#cal-aplicar").addEventListener("click", () => {
+    const leer = (id: string) => Number(($(`#${id}`) as HTMLInputElement).value.replace(",", "."));
+    const izq = leer("cal-izq"), der = leer("cal-der"), arriba = leer("cal-arriba");
+    const crudo = ["cal-izq", "cal-der", "cal-arriba"].map((id) => ($(`#${id}`) as HTMLInputElement).value.trim());
+    if (crudo.some((v) => v === "") || [izq, der, arriba].some((n) => Number.isNaN(n))) {
+      return aviso("Escribe los tres números que leíste en la guía", "error");
+    }
+    if (der <= izq) return aviso("El borde derecho debe ser mayor que el izquierdo", "error");
+    const r = calcularCalibracionU1(o, izq, der, arriba);
+    o.desplazamiento = r.desplazamiento;
+    o.inicioMm = r.inicioMm;
+    guardarAjustes();
+    const avisoAncho =
+      Math.abs(r.anchoMedidoMm - o.anchoMm) > 1.5
+        ? ` Ojo: mediste ${r.anchoMedidoMm} mm de ancho y la etiqueta está configurada en ${o.anchoMm} mm.`
+        : "";
+    $("#cal-resultado").textContent =
+      `Guardado: desplazamiento ${r.desplazamiento} px (${(r.desplazamiento / 8).toFixed(1)} mm), ` +
+      `corrección de inicio ${r.inicioMm} mm.${avisoAncho} Ahora imprime la prueba.`;
+    aviso("Calibración guardada");
+    previa();
+  });
+  const ajustarExtra = (delta: number) => {
+    o.extraMm = Math.max(0, Math.round((o.extraMm + delta) * 2) / 2);
+    guardarAjustes();
+    aviso(`Avance para arrancar: ${o.extraMm} mm`);
+    const campo = document.querySelector<HTMLInputElement>('[data-u1="extraMm"]');
+    if (campo) campo.value = String(o.extraMm);
+  };
+  $("#cal-falta").addEventListener("click", () => ajustarExtra(1));
+  $("#cal-sobra").addEventListener("click", () => ajustarExtra(-1));
 }
 
 // ---------- ajustes ----------

@@ -217,6 +217,11 @@ input:focus-visible, select:focus-visible, button:focus-visible { outline: 2px s
   white-space: pre-wrap; overflow-wrap: anywhere; max-height: 50vh; overflow: auto;
 }
 
+.calibrador { border: 1px dashed var(--borde); border-radius: 12px; padding: 12px; }
+.calibrador h3 { margin: 0 0 4px; font-size: 1rem; }
+.calibrador ol { margin: 0; padding-left: 20px; display: grid; gap: 12px; }
+.calibrador li { display: grid; gap: 8px; }
+.u1-avanzado summary { cursor: pointer; font-weight: 600; margin-bottom: 8px; }
 .u1-grid { display: grid; gap: 10px; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); }
 .u1-previa { width: min(100%, 480px); image-rendering: pixelated; background: #fff; border-radius: 4px; outline: 1px dashed #c62828; }
 
