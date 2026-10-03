@@ -297,10 +297,12 @@ export const GUIA_PREVIA_MM = 5;
  * Guía de calibración: regla horizontal de lado a lado del cabezal (en mm, 0 a 48) a media altura
  * y regla vertical que empieza GUIA_PREVIA_MM antes del borde esperado (marca "0" = borde esperado).
  * Con los números que se ven en los bordes de la etiqueta se calcula el centrado y el inicio.
+ * Mide 1 mm menos que la etiqueta para no invadir la siguiente (si no, la impresora brinca una).
  */
 export function lienzoGuiaU1(altoMm: number): HTMLCanvasElement {
   const pre = GUIA_PREVIA_MM;
-  const h = Math.round((pre + altoMm) * U1_PX_MM);
+  const hasta = altoMm - pre - 1;
+  const h = Math.round((pre + hasta) * U1_PX_MM);
   const c = document.createElement("canvas");
   c.width = U1_ANCHO;
   c.height = h;
@@ -310,7 +312,7 @@ export function lienzoGuiaU1(altoMm: number): HTMLCanvasElement {
   ctx.fillStyle = "#000";
 
   // Regla horizontal a media altura de la etiqueta.
-  const yh = Math.round((pre + altoMm / 2) * U1_PX_MM);
+  const yh = Math.round((pre + Math.min(altoMm / 2, hasta - 3)) * U1_PX_MM);
   ctx.fillRect(0, yh, U1_ANCHO, 2);
   ctx.font = '700 14px "Roboto Condensed", Arial, sans-serif';
   ctx.textAlign = "center";
@@ -327,7 +329,7 @@ export function lienzoGuiaU1(altoMm: number): HTMLCanvasElement {
   ctx.textAlign = "left";
   ctx.textBaseline = "middle";
   ctx.font = '700 12px "Roboto Condensed", Arial, sans-serif';
-  for (let v = -pre; v <= altoMm; v++) {
+  for (let v = -pre; v <= hasta; v++) {
     const y = Math.round((pre + v) * U1_PX_MM);
     const par = v % 2 === 0;
     ctx.fillRect(xv - (par ? 14 : 7), y, par ? 28 : 14, 2);
