@@ -1,6 +1,6 @@
 # Etiquetadora de Decants
 
-App web (PWA) para gestionar el catálogo de perfumes e imprimir etiquetas de decants
+App web (PWA) solo para imprimir etiquetas de decants a partir del catálogo de perfumes
 en una **Niimbot D11** (203 DPI, etiqueta 12 × 40 mm) vía Web Bluetooth.
 
 Funciona en **Chrome para Android** y **Chrome/Edge en PC**. Safari/iPhone no soporta Web Bluetooth.
@@ -10,12 +10,11 @@ Funciona en **Chrome para Android** y **Chrome/Edge en PC**. Safari/iPhone no so
 - **Catálogo**: búsqueda, filtro por marca y por género (Dama / Caballero / Unisex).
 - **Impresión**: elige volumen y cantidad, vista previa exacta (1 px = 1 punto de la impresora).
 - **Etiqueta rápida**: imprime sin guardar en el catálogo.
-- **Inventario**: stock por volumen, aviso de stock bajo, descuento al imprimir con opción de deshacer
-  desde el historial.
 - **Ajustes**: diseño vertical u horizontal, marco decorativo, girar 180°, densidad, logo de la tienda,
   logos de marca, respaldo JSON e importación/exportación CSV.
 
-Los datos se guardan en el navegador del dispositivo (localStorage). Descarga un respaldo JSON de vez en cuando.
+El stock y las ventas se llevan fuera de esta app. El catálogo y los ajustes se guardan en el navegador
+del dispositivo (localStorage); descarga un respaldo JSON de vez en cuando.
 
 ## Desarrollo
 
