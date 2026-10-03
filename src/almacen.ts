@@ -29,8 +29,8 @@ export const AJUSTES_DEFECTO: Ajustes = {
   resolucion: RESOLUCIONES[0],
   logoTienda: null,
   logosMarca: {},
-  // Medido con la guía (dos veces igual): la etiqueta va de ~9 a ~49 mm → centro 29 mm → +40 puntos.
-  u1: { ...OPCIONES_U1_DEFECTO, anchoMm: 40, altoMm: 20, desplazamiento: 40, version: CALIBRACION_U1_VERSION },
+  // Medido con la guía: la etiqueta va de 9.5 a 49.5 mm → centro 29.5 mm → +44 puntos.
+  u1: { ...OPCIONES_U1_DEFECTO, anchoMm: 40, altoMm: 20, desplazamiento: 44, version: CALIBRACION_U1_VERSION },
 };
 
 function leer<T>(clave: string): T | null {

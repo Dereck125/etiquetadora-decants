@@ -61,12 +61,14 @@ export const OPCIONES_U1_DEFECTO: OpcionesU1 = {
   avanceMm: 25,
   modoBE: 0,
   bloque: 100,
-  extraMm: 0,
-  inicioMm: 5,
+  // Calibrado con la U1 del usuario (guía: bordes 9.5 / 49.5 mm, arriba +2 con inicio 5 → 3 mm;
+  // con 6 mm de avance extra la etiqueta se arranca sin jalarla).
+  extraMm: 6,
+  inicioMm: 3,
 };
 
 /** Versión de los valores calibrados por defecto: al subirla se reemplazan los guardados. */
-export const CALIBRACION_U1_VERSION = 2;
+export const CALIBRACION_U1_VERSION = 3;
 
 // ---------- paquetes ----------
 
