@@ -1,0 +1,55 @@
+# Agrega a la app los logos que se suben a logos-nuevos/ desde la web de GitHub (rama develop):
+# los convierte a PNG 1-bit, los registra, publica /dev/ y abre (o actualiza) el Pull Request a master.
+name: Agregar logos nuevos
+
+on:
+  push:
+    branches: [develop]
+    paths: ["logos-nuevos/**"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+  actions: write
+
+concurrency:
+  group: logos
+  cancel-in-progress: false
+
+jobs:
+  procesar:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: develop
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - name: Tomar las imágenes de logos-nuevos/
+        id: logos
+        run: node tools/logos/procesar-nuevos.mjs
+      - name: Convertir a blanco y negro
+        if: steps.logos.outputs.marcas != ''
+        run: node tools/logos/generar-logos.mjs --local
+      - name: Guardar, publicar /dev/ y abrir el Pull Request
+        if: steps.logos.outputs.marcas != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+          MARCAS: ${{ steps.logos.outputs.marcas }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898276+github-actions[bot]@users.noreply.github.com"
+          git add -A logos-nuevos public/logos tools/logos/fuentes.json
+          git commit -m "feat(logos): agregar logo de $MARCAS"
+          git push origin develop
+          # Los push hechos con este token no disparan otros workflows: se lanza la publicación a mano.
+          gh workflow run pages.yml --ref develop
+          if [ -z "$(gh pr list --base master --head develop --state open --json number --jq '.[0].number')" ]; then
+            gh pr create --base master --head develop \
+              --title "Logos nuevos: $MARCAS" \
+              --body "Logos subidos a \`logos-nuevos/\` y convertidos automáticamente. Revísalos en la versión de pruebas (/dev/) y acepta este Pull Request para publicarlos en la app normal."
+          fi
