@@ -11,17 +11,25 @@ export interface Perfume {
   activo: boolean;
 }
 
-export type Diseno = "vertical" | "horizontal";
+/** Resolución de la impresora: se detecta al conectar (D11: 203 DPI / 96 px; D11-H: 300 DPI / 142 px). */
+export interface Resolucion {
+  modelo: string;
+  dpi: number;
+  /** Ancho del cabezal en puntos. */
+  cabezal: number;
+}
 
 export interface Ajustes {
-  diseno: Diseno;
   marco: boolean;
   mayusculas: boolean;
   /** Gira la etiqueta 180° si sale al revés. */
   invertir: boolean;
-  /** Densidad de impresión de la D11 (1–3). */
+  /** Densidad de impresión (el rango real depende del modelo). */
   densidad: number;
   volumenes: number[];
+  /** Volúmenes cuyo frasco solo cubre media etiqueta: se imprime en la mitad superior. */
+  volumenesCortos: number[];
+  resolucion: Resolucion;
   /** Logo de la tienda subido por el usuario (data URL). null = logo incluido en la app. */
   logoTienda: string | null;
   /** Logos de marca subidos por el usuario, por slug de marca (data URL). */

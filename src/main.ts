@@ -4,6 +4,7 @@ import "./style.css";
 
 import {
   AJUSTES_DEFECTO,
+  RESOLUCIONES,
   catalogoPorDefecto,
   estado,
   guardarAjustes,
@@ -51,6 +52,14 @@ function mensajeError(e: unknown): string {
   return m;
 }
 
+/** "3, 5 ,10" → [3, 5, 10] */
+function leerNumeros(texto: string): number[] {
+  return texto
+    .split(/[,;\s]+/)
+    .map(Number)
+    .filter((n) => n > 0);
+}
+
 function leerArchivo(acepta: string): Promise<File | null> {
   return new Promise((resolve) => {
     const input = document.createElement("input");
@@ -95,6 +104,20 @@ impresora.alCambiar((est, detalle) => {
     : est === "imprimiendo" ? "Imprimiendo…"
     : "Conectar impresora";
 });
+/**
+ * Usa la resolución que informa la impresora conectada (D11: 203 DPI, D11-H: 300 DPI…),
+ * para que la etiqueta ocupe exactamente los 12 × 40 mm.
+ */
+function sincronizarResolucion(): void {
+  const r = impresora.resolucion();
+  const actual = estado.ajustes.resolucion;
+  if (!r || (r.dpi === actual.dpi && r.cabezal === actual.cabezal)) return;
+  estado.ajustes.resolucion = r;
+  guardarAjustes();
+  aviso(`Impresora ${r.modelo} detectada (${r.dpi} DPI): la etiqueta se ajustó a su resolución.`);
+  if (vistaActual === "ajustes") vistaAjustes();
+}
+
 btnImpresora.addEventListener("click", async () => {
   try {
     if (impresora.estado === "conectada") {
@@ -102,6 +125,7 @@ btnImpresora.addEventListener("click", async () => {
     } else if (impresora.estado === "desconectada") {
       await impresora.conectar();
       aviso("Impresora conectada");
+      sincronizarResolucion();
     }
   } catch (e) {
     aviso(mensajeError(e), "error");
@@ -116,6 +140,7 @@ async function imprimir(
   try {
     // Conectar primero: Chrome solo abre el selector Bluetooth justo después de un toque.
     if (impresora.estado === "desconectada") await impresora.conectar();
+    sincronizarResolucion();
     const etiqueta = await renderizarEtiqueta(datos, estado.ajustes);
     await impresora.imprimir(lienzoImpresion(etiqueta, estado.ajustes), cantidad, estado.ajustes.densidad, (p, t) =>
       progreso?.(`Imprimiendo ${Math.min(p + 1, t)} de ${t}…`),
@@ -411,26 +436,39 @@ function vistaRapida(): void {
 function vistaAjustes(): void {
   const a = estado.ajustes;
   const marcas = marcasDelCatalogo();
-  const ejemplo: DatosEtiqueta = estado.perfumes[0]
-    ? { nombre: estado.perfumes[0].nombre, marca: estado.perfumes[0].marca, volumen: String(a.volumenes[1] ?? 5) }
-    : { nombre: "Nombre del perfume", marca: "Marca", volumen: "5" };
+  const base = estado.perfumes[0] ?? { nombre: "Nombre del perfume", marca: "Marca" };
+  const volCorto = String(a.volumenesCortos[0] ?? "");
+  const volLargo = String(a.volumenes.find((v) => !a.volumenesCortos.includes(v)) ?? 5);
+  const ejemplos: DatosEtiqueta[] = [
+    { nombre: base.nombre, marca: base.marca, volumen: volLargo },
+    ...(volCorto ? [{ nombre: base.nombre, marca: base.marca, volumen: volCorto }] : []),
+  ];
+  const resIdx = RESOLUCIONES.findIndex((r) => r.dpi === a.resolucion.dpi && r.cabezal === a.resolucion.cabezal);
 
   $("#vista").innerHTML = `
     <section class="tarjeta ajustes-etiqueta">
       <div class="formulario">
         <h2>Etiqueta</h2>
-        <div class="segmentado" id="a-diseno">
-          <button type="button" data-d="vertical" class="${a.diseno === "vertical" ? "activa" : ""}">Vertical</button>
-          <button type="button" data-d="horizontal" class="${a.diseno === "horizontal" ? "activa" : ""}">Horizontal</button>
-        </div>
+        <label>Resolución de la impresora <small>(se detecta sola al conectar)</small>
+          <select id="a-resolucion">
+            ${RESOLUCIONES.map((r, i) => `<option value="${i}" ${i === resIdx ? "selected" : ""}>${esc(r.modelo)} · ${r.dpi} DPI</option>`).join("")}
+            ${resIdx < 0 ? `<option selected>${esc(a.resolucion.modelo)} · ${a.resolucion.dpi} DPI (detectada)</option>` : ""}
+          </select>
+        </label>
+        <label>Etiqueta corta (media etiqueta) para <small>(ml, separados por coma)</small>
+          <input id="a-cortos" value="${esc(a.volumenesCortos.join(", "))}" placeholder="Ninguno" />
+        </label>
         <label class="check"><input type="checkbox" data-a="marco" ${a.marco ? "checked" : ""} /> Marco decorativo</label>
         <label class="check"><input type="checkbox" data-a="mayusculas" ${a.mayusculas ? "checked" : ""} /> Nombre en mayúsculas</label>
         <label class="check"><input type="checkbox" data-a="invertir" ${a.invertir ? "checked" : ""} /> Girar 180° (si sale al revés)</label>
         <label>Densidad de impresión
-          <select id="a-densidad">${[1, 2, 3].map((d) => `<option value="${d}" ${d === a.densidad ? "selected" : ""}>${d}${d === 2 ? " (normal)" : d === 3 ? " (más oscuro)" : " (claro)"}</option>`).join("")}</select>
+          <select id="a-densidad">${[1, 2, 3, 4, 5].map((d) => `<option value="${d}" ${d === a.densidad ? "selected" : ""}>${d}${d === 1 ? " (claro)" : d === 5 ? " (más oscuro)" : ""}</option>`).join("")}</select>
+          <small>La D11 acepta 1–3 y la D11-H 1–5; si eliges más, se usa el máximo de tu modelo.</small>
         </label>
       </div>
-      <figure class="vista-previa"><canvas id="a-previa"></canvas><figcaption>Ejemplo</figcaption></figure>
+      <div class="ejemplos">
+        ${ejemplos.map((e, i) => `<figure class="vista-previa"><canvas data-ejemplo="${i}"></canvas><figcaption>${esc(e.volumen)} ml</figcaption></figure>`).join("")}
+      </div>
     </section>
 
     <section class="tarjeta">
@@ -483,18 +521,22 @@ function vistaAjustes(): void {
       <p class="ayuda">CSV: columnas <code>nombre, marca, genero, nota</code>. Los perfumes importados se agregan al catálogo.</p>
     </section>`;
 
-  const previa = $<HTMLCanvasElement>("#a-previa");
-  const repintar = () => void pintarVistaPrevia(previa, ejemplo);
+  const repintar = () =>
+    $$<HTMLCanvasElement>("[data-ejemplo]").forEach((c) => void pintarVistaPrevia(c, ejemplos[Number(c.dataset.ejemplo)]));
   repintar();
 
-  $$("#a-diseno button").forEach((b) =>
-    b.addEventListener("click", () => {
-      a.diseno = b.dataset.d as typeof a.diseno;
-      $$("#a-diseno button").forEach((x) => x.classList.toggle("activa", x === b));
-      guardarAjustes();
-      repintar();
-    }),
-  );
+  $<HTMLSelectElement>("#a-resolucion").addEventListener("change", (e) => {
+    const r = RESOLUCIONES[Number((e.target as HTMLSelectElement).value)];
+    if (!r) return;
+    a.resolucion = r;
+    guardarAjustes();
+    repintar();
+  });
+  $<HTMLInputElement>("#a-cortos").addEventListener("change", () => {
+    a.volumenesCortos = [...new Set(leerNumeros($<HTMLInputElement>("#a-cortos").value))];
+    guardarAjustes();
+    vistaAjustes();
+  });
   $$<HTMLInputElement>("[data-a]").forEach((inp) =>
     inp.addEventListener("change", () => {
       (a as unknown as Record<string, boolean>)[inp.dataset.a!] = inp.checked;
@@ -507,10 +549,7 @@ function vistaAjustes(): void {
     guardarAjustes();
   });
   $<HTMLInputElement>("#a-vols").addEventListener("change", (e) => {
-    const vols = (e.target as HTMLInputElement).value
-      .split(/[,;\s]+/)
-      .map(Number)
-      .filter((n) => n > 0);
+    const vols = leerNumeros((e.target as HTMLInputElement).value);
     a.volumenes = vols.length ? [...new Set(vols)].sort((x, y) => x - y) : AJUSTES_DEFECTO.volumenes;
     guardarAjustes();
     aviso("Volúmenes guardados");

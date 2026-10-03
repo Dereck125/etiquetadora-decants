@@ -1,3 +1,4 @@
+import type { Resolucion } from "./tipos";
 import {
   ImageEncoder,
   LabelType,
@@ -10,9 +11,8 @@ export type EstadoImpresora = "desconectada" | "conectando" | "conectada" | "imp
 
 type Oyente = (estado: EstadoImpresora, detalle: string) => void;
 
-/** Modelo esperado: Niimbot D11 (203 DPI, cabezal de 96 px). */
+/** Si el modelo no se reconoce, se asume una Niimbot D11. */
 const TAREA_D11: PrintTaskName = "D11_V1";
-const CABEZAL_D11 = 96;
 
 class Impresora {
   private cliente = new NiimbotBluetoothClient();
@@ -47,16 +47,18 @@ class Impresora {
     this.cambiar("conectando", "");
     try {
       const info = await this.cliente.connect();
-      const modelo = this.cliente.getModelMetadata();
-      let detalle = info.deviceName ?? "Niimbot";
-      if (modelo && modelo.printheadPixels !== CABEZAL_D11) {
-        detalle += ` · aviso: cabezal de ${modelo.printheadPixels} px (la app está hecha para la D11 de 96 px)`;
-      }
-      this.cambiar("conectada", detalle);
+      const r = this.resolucion();
+      this.cambiar("conectada", `${info.deviceName ?? "Niimbot"}${r ? ` · ${r.dpi} DPI` : ""}`);
     } catch (e) {
       this.cambiar("desconectada", "");
       throw e;
     }
+  }
+
+  /** Resolución que informa la impresora conectada (null si no se reconoce el modelo). */
+  resolucion(): Resolucion | null {
+    const m = this.cliente.isConnected() ? this.cliente.getModelMetadata() : undefined;
+    return m ? { modelo: m.model, dpi: m.dpi, cabezal: m.printheadPixels } : null;
   }
 
   async desconectar(): Promise<void> {
@@ -65,7 +67,7 @@ class Impresora {
   }
 
   /**
-   * Imprime `cantidad` copias del lienzo de 320 × 96 px.
+   * Imprime `cantidad` copias del lienzo (largo × cabezal).
    * @param progreso recibe (página actual, total) mientras imprime.
    */
   async imprimir(
@@ -76,6 +78,11 @@ class Impresora {
   ): Promise<void> {
     if (!this.cliente.isConnected()) await this.conectar();
     const modelo = this.cliente.getModelMetadata();
+    if (modelo && lienzo.height !== modelo.printheadPixels) {
+      throw new Error(
+        `La etiqueta se generó para un cabezal de ${lienzo.height} px y la impresora usa ${modelo.printheadPixels} px.`,
+      );
+    }
     const tarea = this.cliente.getPrintTaskType() ?? TAREA_D11;
     const direccion = modelo?.printDirection ?? "left";
     const imagen = ImageEncoder.encodeCanvas(lienzo, PageColorType.SingleColor, direccion);

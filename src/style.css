@@ -198,3 +198,6 @@ input:focus-visible, select:focus-visible, button:focus-visible { outline: 2px s
   background: #16130f; color: #f2ede4; box-shadow: 0 8px 30px rgb(0 0 0 / 0.3); font-weight: 600;
 }
 .aviso.error { background: var(--peligro); color: #fff; }
+
+/* ---------- ejemplos en ajustes ---------- */
+.ejemplos { display: flex; gap: 20px; justify-content: center; align-items: start; }

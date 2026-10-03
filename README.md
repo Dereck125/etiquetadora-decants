@@ -10,7 +10,7 @@ Funciona en **Chrome para Android** y **Chrome/Edge en PC**. Safari/iPhone no so
 - **Catálogo**: búsqueda, filtro por marca y por género (Dama / Caballero / Unisex).
 - **Impresión**: elige volumen y cantidad, vista previa exacta (1 px = 1 punto de la impresora).
 - **Etiqueta rápida**: imprime sin guardar en el catálogo.
-- **Ajustes**: diseño vertical u horizontal, marco decorativo, girar 180°, densidad, logo de la tienda,
+- **Ajustes**: resolución, etiqueta corta, marco decorativo, girar 180°, densidad, logo de la tienda,
   logos de marca, respaldo JSON e importación/exportación CSV.
 
 El stock y las ventas se llevan fuera de esta app. El catálogo y los ajustes se guardan en el navegador
@@ -29,7 +29,11 @@ Web Bluetooth solo funciona en `localhost` o con HTTPS. Para usarla desde el cel
 
 ## Etiqueta
 
-- Lienzo de impresión: **320 × 96 px** (40 × 12 mm a 8 px/mm). El diseño vertical se dibuja a 96 × 320 y se gira.
+- Siempre vertical, 12 × 40 mm: logo de la tienda, nombre, logo de la marca y volumen, con marco doble.
+- **Resolución automática**: al conectar, la app lee el modelo y ajusta la imagen a su cabezal
+  (D11: 203 DPI → 96 × 320 px; D11-H / D11 Pro: 300 DPI → 142 × 472 px). También se puede elegir en Ajustes.
+- **Etiqueta corta** (por defecto 3 ml): el frasco solo cubre media etiqueta, así que el diseño ocupa la mitad
+  superior (12 × 20 mm) sin el volumen. Los volúmenes se configuran en Ajustes.
 - Si la etiqueta sale al revés, activa **Girar 180°** en Ajustes.
 - Logos de marca demasiado alargados (menos de 1.5 mm de alto en la etiqueta) se reemplazan por el nombre en texto.
 
