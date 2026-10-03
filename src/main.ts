@@ -14,6 +14,7 @@ import {
   reemplazarPerfumes,
 } from "./almacen";
 import { descargarTexto, perfumesACsv, perfumesDesdeCsv } from "./csv";
+import { diagnosticarBle, diagnosticarSerie } from "./diagnostico";
 import { CANAL, PREFIJO } from "./entorno";
 import { esCorta, lienzoImpresion, renderizarEtiqueta } from "./etiqueta";
 import {
@@ -616,6 +617,23 @@ function vistaAjustes(): void {
       </label>
     </section>
 
+    ${
+      CANAL === "dev"
+        ? `<section class="tarjeta formulario">
+      <h2>Buscar otra impresora <small>(diagnóstico)</small></h2>
+      <p class="ayuda">Cierra la app de la impresora (p. ej. Tiny Print) y enciéndela. Luego:</p>
+      <div class="acciones-sec envolver">
+        <button type="button" class="btn" id="diag-ble">Buscar por Bluetooth (BLE)</button>
+        <button type="button" class="btn" id="diag-serie">Buscar por Bluetooth clásico</button>
+      </div>
+      <p class="ayuda">"BLE" muestra todos los dispositivos cercanos: elige el que aparezca al encender la impresora.
+        "Clásico" solo muestra impresoras ya vinculadas en Ajustes → Bluetooth del teléfono.</p>
+      <pre class="diag-salida" id="diag-salida" hidden></pre>
+      <button type="button" class="btn" id="diag-copiar" hidden>Copiar resultado</button>
+    </section>`
+        : ""
+    }
+
     <section class="tarjeta">
       <h2>Logo de la tienda</h2>
       <div class="logo-tienda">
@@ -676,6 +694,28 @@ function vistaAjustes(): void {
     a.resolucion = r;
     guardarAjustes();
     repintar();
+  });
+  const salidaDiag = document.getElementById("diag-salida");
+  const diagnosticar = async (fn: () => Promise<string>) => {
+    if (!salidaDiag) return;
+    salidaDiag.hidden = false;
+    salidaDiag.textContent = "Buscando…";
+    try {
+      salidaDiag.textContent = await fn();
+      $("#diag-copiar").hidden = false;
+    } catch (e) {
+      salidaDiag.textContent = "No se pudo: " + mensajeError(e);
+    }
+  };
+  document.getElementById("diag-ble")?.addEventListener("click", () => void diagnosticar(diagnosticarBle));
+  document.getElementById("diag-serie")?.addEventListener("click", () => void diagnosticar(diagnosticarSerie));
+  document.getElementById("diag-copiar")?.addEventListener("click", async () => {
+    try {
+      await navigator.clipboard.writeText(salidaDiag?.textContent ?? "");
+      aviso("Resultado copiado: pégalo en el chat");
+    } catch {
+      aviso("No se pudo copiar; selecciona el texto y cópialo a mano", "error");
+    }
   });
   $<HTMLSelectElement>("#a-tipo").addEventListener("change", (e) => {
     const v = (e.target as HTMLSelectElement).value;
