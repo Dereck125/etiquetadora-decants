@@ -25,6 +25,13 @@ export type AvanceU1 = "hueco" | "fijo" | "timini";
 export interface OpcionesU1 {
   /** 1–5 (comando A4). */
   densidad: number;
+  /**
+   * Energía térmica (comando AF, hasta 65535). Más energía = más oscuro pero más lento.
+   * El perfil "u1" de TiMini usa 20000; Cat-Printer usa ~12000 por defecto.
+   */
+  energia: number;
+  /** Velocidad (comando BD): cuanto más bajo, más rápido (menos de 4 puede no avanzar el papel). */
+  velocidad: number;
   avance: AvanceU1;
   /** Para avance "fijo": mm a avanzar tras la imagen. Para "hueco": máximo a buscar. */
   avanceMm: number;
@@ -46,6 +53,8 @@ export interface OpcionesU1 {
 
 export const OPCIONES_U1_DEFECTO: OpcionesU1 = {
   densidad: 3,
+  energia: 20000,
+  velocidad: 10,
   avance: "hueco",
   avanceMm: 25,
   modoBE: 0,
@@ -124,14 +133,14 @@ export function trabajoU1(lienzo: HTMLCanvasElement, o: OpcionesU1, retrocesoMm 
   if (lienzo.width !== U1_ANCHO) throw new Error(`El lienzo debe medir ${U1_ANCHO} px de ancho`);
   const { width: w, height: h } = lienzo;
   const px = lienzo.getContext("2d", { willReadFrequently: true })!.getImageData(0, 0, w, h).data;
-  const VELOCIDAD = 10;
+  const VELOCIDAD = Math.min(255, Math.max(4, Math.round(o.velocidad)));
   const extra = Math.round(Math.max(0, o.extraMm) * U1_PX_MM);
   const retroceso = Math.round(Math.max(0, retrocesoMm) * U1_PX_MM);
   const partes: Uint8Array[] = [
     // A0 = retroceder papel (u16 LE en puntos), para empezar justo en el borde de la etiqueta.
     ...(retroceso > 0 ? [paquete(0xa0, u16(retroceso))] : []),
     paquete(0xa4, [0x30 + Math.min(5, Math.max(1, o.densidad))]),
-    paquete(0xaf, u16(20000)),
+    paquete(0xaf, u16(Math.min(65535, Math.max(1000, Math.round(o.energia))))),
     paquete(0xbe, [o.modoBE]),
     paquete(0xbd, [VELOCIDAD]),
   ];
