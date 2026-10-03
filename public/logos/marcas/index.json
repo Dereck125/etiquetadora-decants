@@ -93,6 +93,13 @@
     "archivo": "jean-paul-gaultier.png"
   },
   {
+    "marca": "Lancôme",
+    "claves": [
+      "lancome"
+    ],
+    "archivo": "lancome.png"
+  },
+  {
     "marca": "Lattafa",
     "claves": [
       "lattafa",
@@ -107,6 +114,13 @@
       "maison-alhambra"
     ],
     "archivo": "maison-alhambra.png"
+  },
+  {
+    "marca": "Nautica",
+    "claves": [
+      "nautica"
+    ],
+    "archivo": "nautica.png"
   },
   {
     "marca": "Prada",
@@ -136,5 +150,28 @@
       "rayhaan"
     ],
     "archivo": "rayhaan.png"
+  },
+  {
+    "marca": "Valentino",
+    "claves": [
+      "valentino"
+    ],
+    "archivo": "valentino.png"
+  },
+  {
+    "marca": "Versace",
+    "claves": [
+      "versace"
+    ],
+    "archivo": "versace.png"
+  },
+  {
+    "marca": "Yves Saint Laurent",
+    "claves": [
+      "yves-saint-laurent",
+      "ysl",
+      "saint-laurent"
+    ],
+    "archivo": "yves-saint-laurent.png"
   }
 ]

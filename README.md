@@ -67,7 +67,9 @@ Web Bluetooth solo funciona en `localhost` o con HTTPS. Para usarla desde el cel
   (p. ej. `versace.svg`), asegúrate de que la marca esté en `fuentes.json` y corre
   `node tools/logos/generar-logos.mjs --local`. También se puede subir desde **Ajustes → Logos de marcas**
   (queda solo en ese dispositivo).
-- Pendientes: Lancôme, Nautica, Valentino, Versace, Yves Saint Laurent.
+- Logos entregados por el usuario (sin URL en `fuentes.json`): Giorgio Armani (águila GA), Lancôme, Valentino,
+  Versace, Yves Saint Laurent. Nautica se arma apilada (vela arriba) desde el SVG de Wikimedia con
+  `node tools/logos/nautica-apilado.mjs`. Las 23 marcas del catálogo tienen logo.
 
 ## Catálogo inicial
 
