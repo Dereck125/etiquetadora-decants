@@ -34,6 +34,10 @@ export interface Ajustes {
   /** Espacio en blanco arriba del diseño, en mm, para centrarlo en la etiqueta. */
   margenSuperiorMm: number;
   resolucion: Resolucion;
+  /** Tipo de etiqueta (LabelType de niimbluelib) o "auto" para usar el que informa el rollo. */
+  tipoEtiqueta: number | "auto";
+  /** Tarea de impresión de niimbluelib (p. ej. "B1") o "auto" para la que corresponde al modelo. */
+  tareaImpresion: string;
   /** Pausa entre paquetes Bluetooth en ms (10 = seguro, 0 = lo más rápido). */
   pausaEnvioMs: number;
   /** Logo de la tienda subido por el usuario (data URL). null = logo incluido en la app. */

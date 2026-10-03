@@ -42,6 +42,10 @@ Web Bluetooth solo funciona en `localhost` o con HTTPS. Para usarla desde el cel
   sale una en blanco, bájalo en Ajustes.
 - **Margen superior** (por defecto 2 mm): la impresora empieza en el borde de la etiqueta, así que el diseño se
   baja para quedar centrado (2 mm arriba, 2 mm abajo con 38 mm de impresión). No alarga la imagen.
+- **Tipo de etiqueta** (Ajustes → Impresora): por defecto se usa el que informa el rollo por RFID. Si la impresora
+  avanza de más y deja una etiqueta vacía entre impresiones, el sensor no está viendo el hueco: prueba otro tipo
+  (p. ej. Transparente). En esa sección se ven el modelo, el firmware y los datos del rollo.
+- **Modo de impresión** (avanzado): fuerza la tarea de niimbluelib (p. ej. B1, que se reporta estable en la D11-H).
 - **Velocidad de envío** (Ajustes): pausa entre paquetes Bluetooth. Una etiqueta de 5 ml son ~290 paquetes, así que
   la pausa de 10 ms (la segura de niimbluelib) suma ~3 s. Rápida/Muy rápida/Máxima usan 5/2/0 ms; si la etiqueta
   sale incompleta, vuelve a la anterior. Al terminar, el aviso muestra cuánto tardó (envío y total).

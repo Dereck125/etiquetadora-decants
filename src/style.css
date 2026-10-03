@@ -201,5 +201,10 @@ input:focus-visible, select:focus-visible, button:focus-visible { outline: 2px s
 }
 .aviso.error { background: var(--peligro); color: #fff; }
 
+/* ---------- impresora en ajustes ---------- */
+.info-impresora { display: grid; grid-template-columns: auto 1fr; gap: 4px 12px; margin: 0; font-size: 0.9rem; }
+.info-impresora dt { color: var(--texto-2); }
+.info-impresora dd { margin: 0; font-weight: 600; overflow-wrap: anywhere; }
+
 /* ---------- ejemplos en ajustes ---------- */
 .ejemplos { display: flex; gap: 20px; justify-content: center; align-items: start; }
