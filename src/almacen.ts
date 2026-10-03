@@ -73,7 +73,9 @@ delete ajustesGuardados.diseno;
 const ajustesIniciales = { ...AJUSTES_DEFECTO, ...ajustesGuardados } as Ajustes;
 ajustesIniciales.u1 = { ...AJUSTES_DEFECTO.u1, ...(ajustesGuardados.u1 ?? {}) };
 // Calibración guardada con valores por defecto anteriores: se adoptan los nuevos medidos.
-if ((ajustesIniciales.u1.version ?? 0) < CALIBRACION_U1_VERSION) {
+// (se mira la versión guardada, no la fusionada: los valores por defecto ya traen la versión actual)
+const versionGuardada = (ajustesGuardados.u1 as Partial<Ajustes["u1"]> | undefined)?.version ?? 0;
+if (ajustesGuardados.u1 && versionGuardada < CALIBRACION_U1_VERSION) {
   const d = AJUSTES_DEFECTO.u1;
   Object.assign(ajustesIniciales.u1, {
     desplazamiento: d.desplazamiento,
