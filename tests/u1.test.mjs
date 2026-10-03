@@ -52,6 +52,7 @@ import { OPCIONES_U1_DEFECTO, calcularCalibracionU1, retrocesoU1, trabajoU1 } fr
 test("Calibración: centro de la etiqueta y corrección de inicio desde la guía", () => {
   // Etiqueta medida de 8 a 48 mm: centro 28 mm = 224 px → 32 px a la derecha del centro (192).
   const r = calcularCalibracionU1({ ...OPCIONES_U1_DEFECTO, inicioMm: 4.5 }, 8, 48, 2);
+  // (la guía empieza en la marca 0 con el mismo retroceso de una etiqueta normal)
   assert.equal(r.desplazamiento, 32);
   assert.equal(r.anchoMedidoMm, 40);
   // El borde de arriba cayó en la marca +2: se retrocedía 2 mm de más → retroceder 2 mm menos.
@@ -73,22 +74,17 @@ test("Trabajo completo: encabezado, líneas y avance hasta el hueco", () => {
   // Línea negra completa: 384 = 3 × 127 + 3, cada corrida con el bit 7 (negro).
   assert.ok(t.includes(Buffer.from(paquete(0xbf, [0xff, 0xff, 0xff, 0x83]))), "línea negra en RLE");
   assert.ok(t.includes(Buffer.from(paquete(0xbf, [127, 127, 127, 3]))), "línea blanca en RLE");
-  const fin = Buffer.concat([
-    paquete(0xbd, [0]),
-    paquete(0xa1, [200, 0, 0x11]),
-    paquete(0xa1, [40, 0]),
-    paquete(0xbd, [0]),
-    paquete(0xa3, [0]),
-  ]);
-  assert.ok(t.subarray(t.length - fin.length).equals(fin), "fin: BD 0 · A1 200+0x11 (hueco) · A1 40 (arrancar) · BD 0 · A3");
+  const fin = Buffer.concat([paquete(0xbd, [0]), paquete(0xa1, [200, 0, 0x11]), paquete(0xbd, [0]), paquete(0xa3, [0])]);
+  assert.ok(t.subarray(t.length - fin.length).equals(fin), "fin: BD 0 · A1 200+0x11 (hueco) · BD 0 · A3");
 });
 
-test("Retroceso: inicio (4.5 mm) + avance extra de la etiqueta anterior (5 mm)", () => {
-  assert.equal(retrocesoU1(OPCIONES_U1_DEFECTO, false), 4.5);
-  assert.equal(retrocesoU1(OPCIONES_U1_DEFECTO, true), 9.5);
+test("Retroceso: 5 mm fijos (back_paper_num 40); el avance extra solo suma si se usó", () => {
+  assert.equal(retrocesoU1(OPCIONES_U1_DEFECTO, false), 5);
+  assert.equal(retrocesoU1(OPCIONES_U1_DEFECTO, true), 5, "sin avance extra por defecto");
+  assert.equal(retrocesoU1({ ...OPCIONES_U1_DEFECTO, extraMm: 3 }, true), 8);
   assert.equal(retrocesoU1({ ...OPCIONES_U1_DEFECTO, avance: "fijo" }, true), 0);
-  const t = Buffer.from(trabajoU1(lienzoFalso(1), OPCIONES_U1_DEFECTO, 9.5));
-  assert.ok(t.subarray(0, 10).equals(Buffer.from(paquete(0xa0, [76, 0]))), "A0 76 puntos");
+  const t = Buffer.from(trabajoU1(lienzoFalso(1), OPCIONES_U1_DEFECTO, 5));
+  assert.ok(t.subarray(0, 10).equals(Buffer.from(paquete(0xa0, [40, 0]))), "A0 40 puntos");
   const sin = Buffer.from(trabajoU1(lienzoFalso(1), OPCIONES_U1_DEFECTO, 0));
   assert.equal(sin[2], 0xa4, "sin retroceso empieza con A4");
 });

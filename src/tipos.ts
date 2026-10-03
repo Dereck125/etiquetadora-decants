@@ -8,6 +8,8 @@ export interface ConfigU1 extends OpcionesU1 {
   altoMm: number;
   /** Desplazamiento horizontal de la etiqueta respecto al centro del cabezal, en puntos. */
   desplazamiento: number;
+  /** Versión de la calibración por defecto con la que se guardó (ver CALIBRACION_U1_VERSION). */
+  version?: number;
 }
 export const GENEROS: Genero[] = ["Dama", "Caballero", "Unisex"];
 

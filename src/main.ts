@@ -557,10 +557,11 @@ function seccionU1(): string {
             quedar solo etiquetas en blanco (si no, la impresora puede imprimir encima). Conecta la U1.</li>
           <li><button type="button" class="btn" id="cal-guia">Imprimir guía de calibración</button>
             <small>Imprímela <b>una sola vez</b>. Sale una regla horizontal con números (mm) y una vertical
-            con marcas −4, −2, 0, +2…</small></li>
+            con marcas 0, +2, +4… (el 0 debería quedar justo en el borde de arriba).</small></li>
           <li>En la etiqueta con la guía, lee qué número queda justo en cada borde. Cada rayita es 1 mm: si el borde
             cae 1 rayita antes del 10, escribe 9. Si el borde queda más allá del último número (48), escribe 49.
-            Para el borde de arriba usa la regla vertical; puede ser negativo (−4).
+            Borde de arriba: si el borde corta la regla vertical, elige la marca que queda en el borde (p. ej. +2).
+            Si arriba del 0 queda espacio en blanco, elige cuántos mm de blanco hay en negativo (2 mm → −2).
             <div class="u1-grid">
               <label>Borde izquierdo<input type="number" id="cal-izq" step="0.5" inputmode="decimal" placeholder="p. ej. 8" /></label>
               <label>Borde derecho<input type="number" id="cal-der" step="0.5" inputmode="decimal" placeholder="p. ej. 48" /></label>
@@ -573,10 +574,13 @@ function seccionU1(): string {
             <button type="button" class="btn primario" id="cal-aplicar">Aplicar calibración</button>
             <p class="ayuda" id="cal-resultado"></p></li>
           <li>Imprime la <b>prueba</b> (botón de arriba): el marco debe caer en el borde de la etiqueta.</li>
-          <li>Al terminar, ¿pudiste arrancarla sin jalar?
+          <li>Si al terminar hay que jalar un poco la etiqueta para arrancarla, es normal en esta impresora
+            (la app original hace lo mismo). Puedes sumar avance extra, pero la siguiente impresión tendrá que
+            retroceder más y puede quedar menos precisa.
             <div class="acciones-sec envolver">
-              <button type="button" class="btn" id="cal-falta">Le faltó papel (+1 mm)</button>
-              <button type="button" class="btn" id="cal-sobra">Salió de más (−1 mm)</button>
+              <button type="button" class="btn" id="cal-falta">Avanzar más al terminar (+1 mm)</button>
+              <button type="button" class="btn" id="cal-sobra">Avanzar menos (−1 mm)</button>
+              <button type="button" class="btn" id="cal-restablecer">Restablecer calibración</button>
             </div></li>
         </ol>
       </div>
@@ -697,6 +701,13 @@ function enlazarU1(): void {
     const campo = document.querySelector<HTMLInputElement>('[data-u1="extraMm"]');
     if (campo) campo.value = String(o.extraMm);
   };
+  $("#cal-restablecer").addEventListener("click", () => {
+    const d = AJUSTES_DEFECTO.u1;
+    Object.assign(o, { desplazamiento: d.desplazamiento, inicioMm: d.inicioMm, extraMm: d.extraMm });
+    guardarAjustes();
+    aviso(`Calibración restablecida: ${d.desplazamiento} px, inicio ${d.inicioMm} mm, avance extra ${d.extraMm} mm`);
+    vistaAjustes();
+  });
   $("#cal-falta").addEventListener("click", () => ajustarExtra(1));
   $("#cal-sobra").addEventListener("click", () => ajustarExtra(-1));
 }
