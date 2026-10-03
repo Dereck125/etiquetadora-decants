@@ -15,6 +15,7 @@ import {
 } from "./almacen";
 import { descargarTexto, perfumesACsv, perfumesDesdeCsv } from "./csv";
 import { diagnosticarBle, diagnosticarSerie } from "./diagnostico";
+import { lienzoPruebaU1, u1 } from "./u1";
 import { CANAL, PREFIJO } from "./entorno";
 import { esCorta, lienzoImpresion, renderizarEtiqueta } from "./etiqueta";
 import {
@@ -25,7 +26,14 @@ import {
   type InfoImpresora,
   type TiemposImpresion,
 } from "./impresora";
-import { cargarLogosIncluidos, procesarLogoSubido, slugMarca, urlLogoMarca, urlLogoTienda } from "./marcas";
+import {
+  cargarImagen,
+  cargarLogosIncluidos,
+  procesarLogoSubido,
+  slugMarca,
+  urlLogoMarca,
+  urlLogoTienda,
+} from "./marcas";
 import { GENEROS, type DatosEtiqueta, type Genero, type Perfume } from "./tipos";
 
 // ---------- utilidades ----------
@@ -512,6 +520,96 @@ function vistaRapida(): void {
   });
 }
 
+// ---------- impresora U1 (pruebas) ----------
+
+function seccionU1(): string {
+  const o = estado.ajustes.u1;
+  const opc = (valores: (string | number)[], actual: string | number, nombre = (v: string | number) => String(v)) =>
+    valores
+      .map((v) => `<option value="${v}" ${String(v) === String(actual) ? "selected" : ""}>${esc(nombre(v))}</option>`)
+      .join("");
+  const avances: Record<string, string> = {
+    hueco: "Buscar el hueco (sensor)",
+    fijo: "Fijo (mm)",
+    timini: "Como TiMini (12 mm)",
+  };
+  return `<section class="tarjeta formulario" id="sec-u1">
+      <h2>Impresora U1 <small>(pruebas)</small></h2>
+      <p class="ayuda">Imprime una etiqueta de calibración: un marco justo en el borde de la etiqueta y una flecha
+        "ARRIBA". Sirve para ajustar el centrado y cómo avanza hasta la siguiente etiqueta.</p>
+      <div class="acciones-sec envolver">
+        <button type="button" class="btn" id="u1-conectar">${u1.conectada ? `Conectada: ${esc(u1.nombre)}` : "Conectar U1"}</button>
+        <button type="button" class="btn primario" id="u1-imprimir">Imprimir prueba</button>
+      </div>
+      <p class="progreso" id="u1-progreso"></p>
+      <div class="u1-grid">
+        <label>Ancho (mm)<input type="number" data-u1="anchoMm" value="${o.anchoMm}" min="15" max="48" /></label>
+        <label>Alto (mm)<input type="number" data-u1="altoMm" value="${o.altoMm}" min="10" max="100" /></label>
+        <label>Desplazamiento (px)<select data-u1="desplazamiento">${opc([-48, -32, -24, -16, -8, 0, 8, 16, 24, 32, 48], o.desplazamiento)}</select></label>
+        <label>Densidad<select data-u1="densidad">${opc([1, 2, 3, 4, 5], o.densidad)}</select></label>
+        <label>Avance al terminar<select data-u1="avance">${opc(Object.keys(avances), o.avance, (v) => avances[String(v)])}</select></label>
+        <label>mm de avance<input type="number" data-u1="avanceMm" value="${o.avanceMm}" min="0" max="60" /></label>
+        <label>Modo BE<select data-u1="modoBE">${opc([0, 1], o.modoBE, (v) => (Number(v) === 0 ? "0 (imagen)" : "1 (texto/etiqueta)"))}</select></label>
+        <label>Bloque BLE<select data-u1="bloque">${opc([20, 100, 180], o.bloque, (v) => `${v} bytes`)}</select></label>
+      </div>
+      <figure class="vista-previa"><canvas id="u1-previa" class="u1-previa"></canvas><figcaption>Vista previa (384 puntos de ancho)</figcaption></figure>
+      <pre class="diag-salida" id="u1-avisos">${esc(u1.avisos.join("\n") || "Avisos de la impresora: —")}</pre>
+    </section>`;
+}
+
+function enlazarU1(): void {
+  const o = estado.ajustes.u1;
+  const previa = () => {
+    void cargarImagen(urlLogoTienda()).then((logo) => {
+      const c = lienzoPruebaU1(o.anchoMm, o.altoMm, o.desplazamiento, logo);
+      const destino = document.getElementById("u1-previa") as HTMLCanvasElement | null;
+      if (!destino) return;
+      destino.width = c.width;
+      destino.height = c.height;
+      destino.getContext("2d")!.drawImage(c, 0, 0);
+    });
+  };
+  previa();
+  $$<HTMLInputElement | HTMLSelectElement>("[data-u1]").forEach((el) =>
+    el.addEventListener("change", () => {
+      const clave = el.dataset.u1!;
+      (o as unknown as Record<string, unknown>)[clave] = clave === "avance" ? el.value : Number(el.value);
+      guardarAjustes();
+      previa();
+    }),
+  );
+  const avisos = document.getElementById("u1-avisos");
+  u1.alAviso = () => {
+    if (avisos) avisos.textContent = u1.avisos.join("\n");
+  };
+  $("#u1-conectar").addEventListener("click", async (e) => {
+    try {
+      await u1.conectar();
+      (e.target as HTMLButtonElement).textContent = `Conectada: ${u1.nombre}`;
+      aviso("U1 conectada");
+    } catch (err) {
+      aviso(mensajeError(err), "error");
+    }
+  });
+  $("#u1-imprimir").addEventListener("click", async (e) => {
+    const btn = e.currentTarget as HTMLButtonElement;
+    const progreso = $("#u1-progreso");
+    btn.disabled = true;
+    try {
+      const logo = await cargarImagen(urlLogoTienda());
+      const inicio = performance.now();
+      await u1.imprimir(lienzoPruebaU1(o.anchoMm, o.altoMm, o.desplazamiento, logo), 1, o, (t) => (progreso.textContent = t));
+      aviso(`Prueba enviada a la U1 en ${((performance.now() - inicio) / 1000).toFixed(1)} s`);
+      $("#u1-conectar").textContent = `Conectada: ${u1.nombre}`;
+    } catch (err) {
+      aviso("No se pudo imprimir en la U1: " + mensajeError(err), "error");
+    } finally {
+      btn.disabled = false;
+      progreso.textContent = "";
+    }
+  });
+}
+
 // ---------- ajustes ----------
 
 function nombreTipo(t: number | undefined): string {
@@ -634,6 +732,8 @@ function vistaAjustes(): void {
         : ""
     }
 
+    ${CANAL === "dev" ? seccionU1() : ""}
+
     <section class="tarjeta">
       <h2>Logo de la tienda</h2>
       <div class="logo-tienda">
@@ -695,6 +795,7 @@ function vistaAjustes(): void {
     guardarAjustes();
     repintar();
   });
+  if (CANAL === "dev") enlazarU1();
   const salidaDiag = document.getElementById("diag-salida");
   const diagnosticar = async (fn: () => Promise<string>) => {
     if (!salidaDiag) return;

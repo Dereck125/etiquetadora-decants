@@ -217,5 +217,8 @@ input:focus-visible, select:focus-visible, button:focus-visible { outline: 2px s
   white-space: pre-wrap; overflow-wrap: anywhere; max-height: 50vh; overflow: auto;
 }
 
+.u1-grid { display: grid; gap: 10px; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); }
+.u1-previa { width: min(100%, 480px); image-rendering: pixelated; background: #fff; border-radius: 4px; outline: 1px dashed #c62828; }
+
 /* ---------- ejemplos en ajustes ---------- */
 .ejemplos { display: flex; gap: 20px; justify-content: center; align-items: start; }
