@@ -1,18 +1,25 @@
 import catalogoInicial from "./datos/catalogo-inicial.json";
-import type { Ajustes, Perfume } from "./tipos";
+import type { Ajustes, Perfume, Resolucion } from "./tipos";
 
 const CLAVES = {
   perfumes: "etq.perfumes",
   ajustes: "etq.ajustes",
 };
 
+/** Resoluciones que se pueden elegir a mano (al conectar se usa la que informa la impresora). */
+export const RESOLUCIONES: Resolucion[] = [
+  { modelo: "D11", dpi: 203, cabezal: 96 },
+  { modelo: "D11-H / D11 Pro", dpi: 300, cabezal: 142 },
+];
+
 export const AJUSTES_DEFECTO: Ajustes = {
-  diseno: "vertical",
   marco: true,
   mayusculas: true,
   invertir: false,
   densidad: 2,
   volumenes: [3, 5, 10, 30],
+  volumenesCortos: [3],
+  resolucion: RESOLUCIONES[0],
   logoTienda: null,
   logosMarca: {},
 };
@@ -52,6 +59,7 @@ try {
 
 const ajustesGuardados = leer<Partial<Ajustes> & Record<string, unknown>>(CLAVES.ajustes) ?? {};
 delete ajustesGuardados.stockBajo;
+delete ajustesGuardados.diseno;
 
 export const estado = {
   perfumes: (leer<Perfume[]>(CLAVES.perfumes) ?? catalogoPorDefecto()).map(limpiarPerfume),
