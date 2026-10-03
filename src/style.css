@@ -59,6 +59,7 @@ button, input, select { font: inherit; color: inherit; }
 }
 .barra-logo { width: 34px; height: 34px; object-fit: contain; filter: invert(1); }
 .barra h1 { margin: 0; font-size: 1.25rem; font-weight: 700; flex: 1; text-transform: uppercase; letter-spacing: 0.12em; }
+.impresoras { display: flex; gap: 6px; }
 .btn-impresora {
   display: inline-flex; align-items: center; gap: 8px; max-width: 55%;
   border: 1px solid #4a4237; background: transparent; color: inherit;
@@ -127,6 +128,16 @@ input:focus-visible, select:focus-visible, button:focus-visible { outline: 2px s
 .progreso { min-height: 1.2em; margin: 0; color: var(--dorado); font-weight: 600; text-align: center; }
 
 /* ---------- catálogo ---------- */
+.modos { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.modo {
+  display: grid; gap: 2px; padding: 16px 12px; border-radius: var(--radio); cursor: pointer; text-align: center;
+  border: 2px solid var(--borde); background: var(--superficie); color: var(--texto); box-shadow: var(--sombra);
+}
+.modo b { font-family: "Roboto Condensed", system-ui, sans-serif; font-size: 1.15rem; }
+.modo span { color: var(--texto-2); font-size: 0.95rem; }
+.modo.activa { border-color: var(--acento); background: var(--acento); color: var(--acento-texto); }
+.modo.activa span { color: inherit; opacity: 0.8; }
+
 .filtros { display: grid; gap: 8px; grid-template-columns: 1fr; }
 @media (min-width: 720px) { .filtros { grid-template-columns: 2fr 1fr; } .filtros .segmentado { grid-column: 1 / -1; } }
 
@@ -159,6 +170,7 @@ input:focus-visible, select:focus-visible, button:focus-visible { outline: 2px s
   box-shadow: 0 0 0 1px rgb(0 0 0 / 0.08), 0 6px 20px rgb(0 0 0 / 0.15);
 }
 @media (min-width: 640px) { .papel { height: min(60vh, 480px); } }
+.papel.horizontal { aspect-ratio: 40 / 20; height: auto; width: min(100%, 420px); }
 .papel canvas { display: block; width: 100%; height: auto; image-rendering: pixelated; }
 .vista-previa figcaption { font-size: 0.8rem; color: var(--texto-2); }
 

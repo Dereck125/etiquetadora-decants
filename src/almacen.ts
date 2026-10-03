@@ -21,6 +21,7 @@ export const AJUSTES_DEFECTO: Ajustes = {
   densidad: 2,
   volumenes: [3, 5, 10, 30],
   volumenesCortos: [3],
+  volumenesGrandes: [30],
   largoMm: 38,
   margenSuperiorMm: 2,
   pausaEnvioMs: 10,
@@ -35,7 +36,7 @@ export const AJUSTES_DEFECTO: Ajustes = {
     anchoMm: 40,
     altoMm: 20,
     desplazamiento: 44,
-    margenArribaMm: 1,
+    margenArribaMm: 2.5,
     version: CALIBRACION_U1_VERSION,
   },
 };
@@ -88,6 +89,7 @@ if (ajustesGuardados.u1 && versionGuardada < CALIBRACION_U1_VERSION) {
     desplazamiento: d.desplazamiento,
     inicioMm: d.inicioMm,
     extraMm: d.extraMm,
+    margenArribaMm: d.margenArribaMm,
     version: CALIBRACION_U1_VERSION,
   });
 }
