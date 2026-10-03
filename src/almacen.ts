@@ -1,6 +1,7 @@
 import catalogoInicial from "./datos/catalogo-inicial.json";
 import { PREFIJO } from "./entorno";
 import type { Ajustes, Perfume, Resolucion } from "./tipos";
+import { OPCIONES_U1_DEFECTO } from "./u1";
 
 const CLAVES = {
   perfumes: `${PREFIJO}perfumes`,
@@ -28,6 +29,7 @@ export const AJUSTES_DEFECTO: Ajustes = {
   resolucion: RESOLUCIONES[0],
   logoTienda: null,
   logosMarca: {},
+  u1: { ...OPCIONES_U1_DEFECTO, anchoMm: 40, altoMm: 20, desplazamiento: 0 },
 };
 
 function leer<T>(clave: string): T | null {
@@ -67,9 +69,12 @@ const ajustesGuardados = leer<Partial<Ajustes> & Record<string, unknown>>(CLAVES
 delete ajustesGuardados.stockBajo;
 delete ajustesGuardados.diseno;
 
+const ajustesIniciales = { ...AJUSTES_DEFECTO, ...ajustesGuardados } as Ajustes;
+ajustesIniciales.u1 = { ...AJUSTES_DEFECTO.u1, ...(ajustesGuardados.u1 ?? {}) };
+
 export const estado = {
   perfumes: (leer<Perfume[]>(CLAVES.perfumes) ?? catalogoPorDefecto()).map(limpiarPerfume),
-  ajustes: { ...AJUSTES_DEFECTO, ...ajustesGuardados } as Ajustes,
+  ajustes: ajustesIniciales,
 };
 
 export function guardarPerfumes(): void {

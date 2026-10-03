@@ -1,4 +1,14 @@
+import type { OpcionesU1 } from "./u1";
+
 export type Genero = "Dama" | "Caballero" | "Unisex";
+
+/** Configuración de la segunda impresora (Yihetangde U1), en pruebas. */
+export interface ConfigU1 extends OpcionesU1 {
+  anchoMm: number;
+  altoMm: number;
+  /** Desplazamiento horizontal de la etiqueta respecto al centro del cabezal, en puntos. */
+  desplazamiento: number;
+}
 export const GENEROS: Genero[] = ["Dama", "Caballero", "Unisex"];
 
 export interface Perfume {
@@ -44,6 +54,7 @@ export interface Ajustes {
   logoTienda: string | null;
   /** Logos de marca subidos por el usuario, por slug de marca (data URL). */
   logosMarca: Record<string, string>;
+  u1: ConfigU1;
 }
 
 export interface DatosEtiqueta {
