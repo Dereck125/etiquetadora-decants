@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#16130f" />
+    <meta name="description" content="Catálogo e impresión de etiquetas de decants para Niimbot D11" />
+    <link rel="manifest" href="manifest.webmanifest" />
+    <link rel="icon" type="image/png" href="icono-192.png" />
+    <link rel="apple-touch-icon" href="icono-192.png" />
+    <title>Etiquetadora de Decants</title>
+  </head>
+  <body>
+    <header class="barra">
+      <img src="logos/tienda.png" class="barra-logo" alt="" />
+      <h1>Decants</h1>
+      <button id="btn-impresora" class="btn-impresora" type="button">
+        <span class="punto"></span><span id="txt-impresora">Conectar impresora</span>
+      </button>
+    </header>
+    <nav class="pestanas" aria-label="Secciones">
+      <button type="button" data-vista="catalogo" class="activa">Catálogo</button>
+      <button type="button" data-vista="rapida">Etiqueta rápida</button>
+      <button type="button" data-vista="inventario">Inventario</button>
+      <button type="button" data-vista="ajustes">Ajustes</button>
+    </nav>
+    <main id="vista"></main>
+    <dialog id="dlg-imprimir" class="dialogo"></dialog>
+    <dialog id="dlg-perfume" class="dialogo"></dialog>
+    <div id="aviso" class="aviso" role="status" popover="manual"></div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

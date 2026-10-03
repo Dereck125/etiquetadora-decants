@@ -35,3 +35,17 @@ await sharp(bits, { raw: { width: w, height: h, channels: 1 } })
   .png({ palette: true, colours: 2 })
   .toFile(path.join(DIR, "..", "..", "public", "logos", "tienda.png"));
 console.log("ok public/logos/tienda.png", { left, top, right, bottom });
+
+// Íconos de la app (PWA): logo en blanco sobre fondo oscuro, con margen para íconos "maskable".
+const PUBLIC = path.join(DIR, "..", "..", "public");
+const logo = path.join(PUBLIC, "logos", "tienda.png");
+for (const lado of [192, 512]) {
+  const interior = Math.round(lado * 0.6);
+  const blanco = await sharp(logo)
+    .resize(interior, interior, { fit: "contain", background: "#ffffff" })
+    .flatten({ background: "#ffffff" }).negate({ alpha: false }).png().toBuffer();
+  await sharp({ create: { width: lado, height: lado, channels: 3, background: "#16130f" } })
+    .composite([{ input: blanco, blend: "lighten" }])
+    .png().toFile(path.join(PUBLIC, `icono-${lado}.png`));
+}
+console.log("ok public/icono-192.png, public/icono-512.png");

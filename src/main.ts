@@ -1,0 +1,769 @@
+import "@fontsource/roboto-condensed/400.css";
+import "@fontsource/roboto-condensed/700.css";
+import "./style.css";
+
+import {
+  AJUSTES_DEFECTO,
+  catalogoPorDefecto,
+  estado,
+  guardarAjustes,
+  guardarHistorial,
+  guardarPerfumes,
+  marcasDelCatalogo,
+  nuevoId,
+  stock,
+} from "./almacen";
+import { descargarTexto, perfumesACsv, perfumesDesdeCsv } from "./csv";
+import { formatoVolumen, lienzoImpresion, renderizarEtiqueta } from "./etiqueta";
+import { impresora } from "./impresora";
+import { cargarLogosIncluidos, procesarLogoSubido, slugMarca, urlLogoMarca, urlLogoTienda } from "./marcas";
+import { GENEROS, type DatosEtiqueta, type Genero, type Perfume } from "./tipos";
+
+// ---------- utilidades ----------
+
+const $ = <T extends HTMLElement = HTMLElement>(sel: string, raiz: ParentNode = document) =>
+  raiz.querySelector<T>(sel)!;
+const $$ = <T extends HTMLElement = HTMLElement>(sel: string, raiz: ParentNode = document) =>
+  [...raiz.querySelectorAll<T>(sel)];
+
+function esc(v: unknown): string {
+  return String(v ?? "").replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
+}
+
+let temporizadorAviso = 0;
+function aviso(texto: string, tipo: "ok" | "error" = "ok"): void {
+  // Es un popover: vive en la capa superior, así se ve también encima de los diálogos.
+  const el = $("#aviso");
+  el.textContent = texto;
+  el.className = `aviso ${tipo}`;
+  if (el.matches(":popover-open")) el.hidePopover();
+  el.showPopover();
+  clearTimeout(temporizadorAviso);
+  temporizadorAviso = window.setTimeout(() => el.hidePopover(), tipo === "error" ? 7000 : 3500);
+}
+
+function mensajeError(e: unknown): string {
+  const m = e instanceof Error ? e.message : String(e);
+  if (/User cancelled|cancelled the requestDevice/i.test(m)) return "Conexión cancelada.";
+  if (/adapter not available|Bluetooth is (off|disabled)/i.test(m)) return "Bluetooth apagado o no disponible en este equipo.";
+  if (/user gesture/i.test(m)) return 'Toca "Conectar impresora" arriba y vuelve a intentar.';
+  if (/GATT|disconnected/i.test(m)) return "Se perdió la conexión con la impresora. Vuelve a conectarla.";
+  if (/timeout/i.test(m)) return "La impresora no respondió a tiempo. ¿Está encendida y con etiquetas?";
+  return m;
+}
+
+function leerArchivo(acepta: string): Promise<File | null> {
+  return new Promise((resolve) => {
+    const input = document.createElement("input");
+    input.type = "file";
+    input.accept = acepta;
+    input.onchange = () => resolve(input.files?.[0] ?? null);
+    input.click();
+  });
+}
+
+/** Dibuja la etiqueta en un canvas visible (vista previa). Evita carreras entre renders. */
+const versionesPrevia = new WeakMap<HTMLCanvasElement, number>();
+async function pintarVistaPrevia(destino: HTMLCanvasElement, datos: DatosEtiqueta): Promise<HTMLCanvasElement> {
+  const v = (versionesPrevia.get(destino) ?? 0) + 1;
+  versionesPrevia.set(destino, v);
+  const etiqueta = await renderizarEtiqueta(datos, estado.ajustes);
+  if (versionesPrevia.get(destino) === v) {
+    destino.width = etiqueta.width;
+    destino.height = etiqueta.height;
+    destino.getContext("2d")!.drawImage(etiqueta, 0, 0);
+    destino.classList.toggle("vertical", etiqueta.height > etiqueta.width);
+  }
+  return etiqueta;
+}
+
+async function descargarPng(datos: DatosEtiqueta): Promise<void> {
+  const etiqueta = await renderizarEtiqueta(datos, estado.ajustes);
+  const a = document.createElement("a");
+  a.href = etiqueta.toDataURL("image/png");
+  a.download = `etiqueta-${slugMarca(datos.nombre) || "decant"}-${slugMarca(datos.volumen)}.png`;
+  a.click();
+}
+
+// ---------- impresora ----------
+
+const btnImpresora = $("#btn-impresora");
+impresora.alCambiar((est, detalle) => {
+  btnImpresora.dataset.estado = est;
+  $("#txt-impresora").textContent =
+    est === "conectada" ? detalle || "Conectada"
+    : est === "conectando" ? "Conectando…"
+    : est === "imprimiendo" ? "Imprimiendo…"
+    : "Conectar impresora";
+});
+btnImpresora.addEventListener("click", async () => {
+  try {
+    if (impresora.estado === "conectada") {
+      if (confirm("¿Desconectar la impresora?")) await impresora.desconectar();
+    } else if (impresora.estado === "desconectada") {
+      await impresora.conectar();
+      aviso("Impresora conectada");
+    }
+  } catch (e) {
+    aviso(mensajeError(e), "error");
+  }
+});
+
+async function imprimir(
+  datos: DatosEtiqueta,
+  cantidad: number,
+  opciones: { perfume?: Perfume; volumen?: string; descontar?: boolean; progreso?: (t: string) => void },
+): Promise<boolean> {
+  try {
+    // Conectar primero: Chrome solo abre el selector Bluetooth justo después de un toque.
+    if (impresora.estado === "desconectada") await impresora.conectar();
+    const etiqueta = await renderizarEtiqueta(datos, estado.ajustes);
+    await impresora.imprimir(lienzoImpresion(etiqueta, estado.ajustes), cantidad, estado.ajustes.densidad, (p, t) =>
+      opciones.progreso?.(`Imprimiendo ${Math.min(p + 1, t)} de ${t}…`),
+    );
+  } catch (e) {
+    aviso("No se pudo imprimir: " + mensajeError(e), "error");
+    return false;
+  }
+  let descontado = 0;
+  const { perfume, volumen } = opciones;
+  if (perfume && volumen && opciones.descontar) {
+    const antes = stock(perfume, volumen);
+    const despues = Math.max(0, antes - cantidad);
+    descontado = antes - despues;
+    perfume.inventario[volumen] = despues;
+    guardarPerfumes();
+  }
+  estado.historial.unshift({
+    id: nuevoId("h"),
+    fecha: new Date().toISOString(),
+    perfumeId: perfume?.id ?? null,
+    nombre: datos.nombre,
+    marca: datos.marca,
+    volumen: datos.volumen,
+    cantidad,
+    descontado,
+  });
+  guardarHistorial();
+  aviso(`Listo: ${cantidad} etiqueta${cantidad === 1 ? "" : "s"} de ${datos.nombre}`);
+  return true;
+}
+
+// ---------- navegación ----------
+
+type Vista = "catalogo" | "rapida" | "inventario" | "ajustes";
+let vistaActual: Vista = "catalogo";
+const vistas: Record<Vista, () => void> = {
+  catalogo: vistaCatalogo,
+  rapida: vistaRapida,
+  inventario: vistaInventario,
+  ajustes: vistaAjustes,
+};
+
+function irA(v: Vista): void {
+  vistaActual = v;
+  $$("[data-vista]").forEach((b) => b.classList.toggle("activa", b.dataset.vista === v));
+  vistas[v]();
+  try { sessionStorage.setItem("etq.vista", v); } catch { /* sin almacenamiento */ }
+}
+$$("[data-vista]").forEach((b) => b.addEventListener("click", () => irA(b.dataset.vista as Vista)));
+
+// ---------- catálogo ----------
+
+const filtro = { texto: "", marca: "", genero: "" as Genero | "" };
+
+function miniLogo(marca: string): string {
+  const url = urlLogoMarca(marca);
+  if (url) return `<span class="mini-logo"><img src="${esc(url)}" alt="" loading="lazy" /></span>`;
+  const iniciales = marca.split(/\s+/).map((p) => p[0]).join("").slice(0, 2).toUpperCase();
+  return `<span class="mini-logo vacio">${esc(iniciales || "?")}</span>`;
+}
+
+function chipsStock(p: Perfume): string {
+  return estado.ajustes.volumenes
+    .map((v) => {
+      const n = stock(p, v);
+      return `<span class="chip ${n <= estado.ajustes.stockBajo ? "bajo" : ""}" title="${v} ml">${v}<small>ml</small> ${n}</span>`;
+    })
+    .join("");
+}
+
+function perfumesFiltrados(): Perfume[] {
+  const t = slugMarca(filtro.texto);
+  return estado.perfumes
+    .filter((p) => !filtro.marca || p.marca === filtro.marca)
+    .filter((p) => !filtro.genero || p.genero === filtro.genero)
+    .filter((p) => !t || slugMarca(`${p.nombre} ${p.marca} ${p.nota}`).includes(t))
+    .sort((a, b) => a.marca.localeCompare(b.marca, "es") || a.nombre.localeCompare(b.nombre, "es"));
+}
+
+function vistaCatalogo(): void {
+  const marcas = marcasDelCatalogo();
+  $("#vista").innerHTML = `
+    <section class="filtros">
+      <input type="search" id="f-buscar" placeholder="Buscar perfume, marca o nota…" value="${esc(filtro.texto)}" />
+      <select id="f-marca">
+        <option value="">Todas las marcas</option>
+        ${marcas.map((m) => `<option ${m === filtro.marca ? "selected" : ""}>${esc(m)}</option>`).join("")}
+      </select>
+      <div class="segmentado" id="f-genero">
+        ${["", ...GENEROS].map((g) => `<button type="button" data-g="${g}" class="${g === filtro.genero ? "activa" : ""}">${g || "Todos"}</button>`).join("")}
+      </div>
+    </section>
+    <div class="lista-cabecera">
+      <span id="conteo"></span>
+      <button type="button" class="btn" id="btn-nuevo">+ Nuevo perfume</button>
+    </div>
+    <ul class="lista" id="lista"></ul>`;
+
+  const pintarLista = () => {
+    const lista = perfumesFiltrados();
+    $("#conteo").textContent = `${lista.length} perfume${lista.length === 1 ? "" : "s"}`;
+    $("#lista").innerHTML = lista.length
+      ? lista
+          .map(
+            (p) => `
+        <li><button type="button" class="fila" data-id="${esc(p.id)}">
+          ${miniLogo(p.marca)}
+          <span class="info">
+            <strong>${esc(p.nombre)}</strong>
+            <small>${esc(p.marca)} · ${esc(p.genero)}${p.nota ? ` · <em>${esc(p.nota)}</em>` : ""}</small>
+          </span>
+          <span class="chips">${chipsStock(p)}</span>
+        </button></li>`,
+          )
+          .join("")
+      : `<li class="vacio-lista">No hay perfumes con esos filtros.</li>`;
+  };
+  pintarLista();
+
+  $<HTMLInputElement>("#f-buscar").addEventListener("input", (e) => {
+    filtro.texto = (e.target as HTMLInputElement).value;
+    pintarLista();
+  });
+  $<HTMLSelectElement>("#f-marca").addEventListener("change", (e) => {
+    filtro.marca = (e.target as HTMLSelectElement).value;
+    pintarLista();
+  });
+  $$("#f-genero button").forEach((b) =>
+    b.addEventListener("click", () => {
+      filtro.genero = b.dataset.g as Genero | "";
+      $$("#f-genero button").forEach((x) => x.classList.toggle("activa", x === b));
+      pintarLista();
+    }),
+  );
+  $("#btn-nuevo").addEventListener("click", () => abrirEditor(null));
+  $("#lista").addEventListener("click", (e) => {
+    const fila = (e.target as HTMLElement).closest<HTMLElement>(".fila");
+    const p = estado.perfumes.find((x) => x.id === fila?.dataset.id);
+    if (p) abrirImpresion(p);
+  });
+}
+
+// ---------- diálogo de impresión ----------
+
+function abrirImpresion(p: Perfume): void {
+  const dlg = $<HTMLDialogElement>("#dlg-imprimir");
+  const vols = estado.ajustes.volumenes;
+  let volumen = String(vols.find((v) => stock(p, v) > 0) ?? vols[0] ?? 5);
+
+  dlg.innerHTML = `
+    <form method="dialog" class="dialogo-contenido">
+      <header class="dialogo-cabecera">
+        <div><h2>${esc(p.nombre)}</h2><small>${esc(p.marca)} · ${esc(p.genero)}</small></div>
+        <button class="cerrar" value="cerrar" aria-label="Cerrar">×</button>
+      </header>
+      <div class="imprimir-cuerpo">
+        <figure class="vista-previa"><canvas id="i-previa"></canvas><figcaption>12 × 40 mm</figcaption></figure>
+        <div class="controles">
+          <label class="etiqueta-campo">Volumen</label>
+          <div class="segmentado volumenes" id="i-vol">
+            ${vols.map((v) => `<button type="button" data-v="${v}"><b>${v} ml</b><small>stock ${stock(p, v)}</small></button>`).join("")}
+          </div>
+          <label class="etiqueta-campo" for="i-cant">Cantidad de etiquetas</label>
+          <div class="stepper">
+            <button type="button" data-paso="-1" aria-label="Menos">−</button>
+            <input id="i-cant" type="number" min="1" max="99" value="1" inputmode="numeric" />
+            <button type="button" data-paso="1" aria-label="Más">+</button>
+          </div>
+          <label class="check"><input type="checkbox" id="i-descontar" checked /> Descontar del inventario</label>
+          <button type="button" class="btn primario grande" id="i-imprimir">Imprimir</button>
+          <p class="progreso" id="i-progreso"></p>
+          <div class="acciones-sec">
+            <button type="button" class="btn" id="i-editar">Editar perfume</button>
+            <button type="button" class="btn" id="i-png">Descargar PNG</button>
+          </div>
+        </div>
+      </div>
+    </form>`;
+
+  const datos = (): DatosEtiqueta => ({ nombre: p.nombre, marca: p.marca, volumen });
+  const canvas = $<HTMLCanvasElement>("#i-previa", dlg);
+  const cant = $<HTMLInputElement>("#i-cant", dlg);
+  const marcarVol = () => $$("#i-vol button", dlg).forEach((b) => b.classList.toggle("activa", b.dataset.v === volumen));
+  marcarVol();
+  void pintarVistaPrevia(canvas, datos());
+
+  $$("#i-vol button", dlg).forEach((b) =>
+    b.addEventListener("click", () => {
+      volumen = b.dataset.v!;
+      marcarVol();
+      void pintarVistaPrevia(canvas, datos());
+    }),
+  );
+  $$(".stepper button", dlg).forEach((b) =>
+    b.addEventListener("click", () => {
+      cant.value = String(Math.min(99, Math.max(1, (parseInt(cant.value, 10) || 1) + Number(b.dataset.paso))));
+    }),
+  );
+  $("#i-editar", dlg).addEventListener("click", () => {
+    dlg.close();
+    abrirEditor(p);
+  });
+  $("#i-png", dlg).addEventListener("click", () => void descargarPng(datos()));
+  $("#i-imprimir", dlg).addEventListener("click", async (e) => {
+    const btn = e.currentTarget as HTMLButtonElement;
+    const progreso = $("#i-progreso", dlg);
+    btn.disabled = true;
+    progreso.textContent = "Enviando a la impresora…";
+    const ok = await imprimir(datos(), Math.max(1, parseInt(cant.value, 10) || 1), {
+      perfume: p,
+      volumen,
+      descontar: $<HTMLInputElement>("#i-descontar", dlg).checked,
+      progreso: (t) => (progreso.textContent = t),
+    });
+    btn.disabled = false;
+    progreso.textContent = "";
+    if (ok) {
+      dlg.close();
+      vistas[vistaActual]();
+    }
+  });
+  dlg.showModal();
+}
+
+// ---------- editor de perfume ----------
+
+function abrirEditor(p: Perfume | null): void {
+  const dlg = $<HTMLDialogElement>("#dlg-perfume");
+  const vols = estado.ajustes.volumenes;
+  dlg.innerHTML = `
+    <form class="dialogo-contenido formulario" id="form-perfume">
+      <header class="dialogo-cabecera">
+        <h2>${p ? "Editar perfume" : "Nuevo perfume"}</h2>
+        <button type="button" class="cerrar" id="e-cerrar" aria-label="Cerrar">×</button>
+      </header>
+      <label>Nombre<input name="nombre" required value="${esc(p?.nombre)}" autocomplete="off" /></label>
+      <label>Marca<input name="marca" list="lista-marcas" value="${esc(p?.marca)}" autocomplete="off" /></label>
+      <datalist id="lista-marcas">${marcasDelCatalogo().map((m) => `<option value="${esc(m)}">`).join("")}</datalist>
+      <label>Género
+        <select name="genero">${GENEROS.map((g) => `<option ${g === (p?.genero ?? "Unisex") ? "selected" : ""}>${g}</option>`).join("")}</select>
+      </label>
+      <label>Nota interna <small>(no se imprime)</small><input name="nota" value="${esc(p?.nota)}" /></label>
+      <fieldset class="stock-campos"><legend>Stock</legend>
+        ${vols.map((v) => `<label>${v} ml<input type="number" min="0" name="stock_${v}" value="${p ? stock(p, v) : 0}" inputmode="numeric" /></label>`).join("")}
+      </fieldset>
+      <footer class="dialogo-pie">
+        ${p ? `<button type="button" class="btn peligro" id="e-borrar">Eliminar</button>` : "<span></span>"}
+        <button type="submit" class="btn primario">Guardar</button>
+      </footer>
+    </form>`;
+
+  const form = $<HTMLFormElement>("#form-perfume", dlg);
+  $("#e-cerrar", dlg).addEventListener("click", () => dlg.close());
+  form.addEventListener("submit", (e) => {
+    e.preventDefault();
+    const f = new FormData(form);
+    const inventario: Record<string, number> = { ...(p?.inventario ?? {}) };
+    for (const v of vols) inventario[String(v)] = Math.max(0, parseInt(String(f.get(`stock_${v}`)), 10) || 0);
+    const datos = {
+      nombre: String(f.get("nombre")).trim(),
+      marca: String(f.get("marca")).trim(),
+      genero: f.get("genero") as Genero,
+      nota: String(f.get("nota")).trim(),
+      inventario,
+    };
+    if (p) Object.assign(p, datos);
+    else estado.perfumes.push({ id: nuevoId(), activo: true, ...datos });
+    guardarPerfumes();
+    dlg.close();
+    aviso("Perfume guardado");
+    vistas[vistaActual]();
+  });
+  $("#e-borrar", dlg)?.addEventListener("click", () => {
+    if (!p || !confirm(`¿Eliminar "${p.nombre}" del catálogo?`)) return;
+    estado.perfumes = estado.perfumes.filter((x) => x.id !== p.id);
+    guardarPerfumes();
+    dlg.close();
+    aviso("Perfume eliminado");
+    vistas[vistaActual]();
+  });
+  dlg.showModal();
+}
+
+// ---------- etiqueta rápida ----------
+
+const rapida: DatosEtiqueta & { cantidad: number } = { nombre: "", marca: "", volumen: "5", cantidad: 1 };
+
+function vistaRapida(): void {
+  $("#vista").innerHTML = `
+    <section class="tarjeta rapida">
+      <form class="formulario" id="form-rapida">
+        <p class="ayuda">Imprime una etiqueta sin guardarla en el catálogo.</p>
+        <label>Nombre del perfume<input name="nombre" value="${esc(rapida.nombre)}" placeholder="Ej. Khamrah" autocomplete="off" /></label>
+        <label>Marca<input name="marca" list="lista-marcas-r" value="${esc(rapida.marca)}" placeholder="Ej. Lattafa" autocomplete="off" /></label>
+        <datalist id="lista-marcas-r">${marcasDelCatalogo().map((m) => `<option value="${esc(m)}">`).join("")}</datalist>
+        <label>Volumen <small>(número en ml o texto libre)</small><input name="volumen" value="${esc(rapida.volumen)}" /></label>
+        <label>Cantidad<input name="cantidad" type="number" min="1" max="99" value="${rapida.cantidad}" inputmode="numeric" /></label>
+        <button type="submit" class="btn primario grande">Imprimir</button>
+        <p class="progreso" id="r-progreso"></p>
+        <button type="button" class="btn" id="r-png">Descargar PNG</button>
+      </form>
+      <figure class="vista-previa"><canvas id="r-previa"></canvas><figcaption>12 × 40 mm</figcaption></figure>
+    </section>`;
+  const form = $<HTMLFormElement>("#form-rapida");
+  const canvas = $<HTMLCanvasElement>("#r-previa");
+  const leer = () => {
+    const f = new FormData(form);
+    rapida.nombre = String(f.get("nombre"));
+    rapida.marca = String(f.get("marca"));
+    rapida.volumen = String(f.get("volumen"));
+    rapida.cantidad = Math.max(1, parseInt(String(f.get("cantidad")), 10) || 1);
+  };
+  const previa = () => void pintarVistaPrevia(canvas, { ...rapida, nombre: rapida.nombre || "Nombre del perfume" });
+  previa();
+  form.addEventListener("input", () => {
+    leer();
+    previa();
+  });
+  $("#r-png").addEventListener("click", () => void descargarPng(rapida));
+  form.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    leer();
+    if (!rapida.nombre.trim()) return aviso("Escribe el nombre del perfume", "error");
+    const btn = form.querySelector<HTMLButtonElement>("[type=submit]")!;
+    const progreso = $("#r-progreso");
+    btn.disabled = true;
+    progreso.textContent = "Enviando a la impresora…";
+    await imprimir({ ...rapida }, rapida.cantidad, { progreso: (t) => (progreso.textContent = t) });
+    btn.disabled = false;
+    progreso.textContent = "";
+  });
+}
+
+// ---------- inventario ----------
+
+let soloBajo = false;
+
+function vistaInventario(): void {
+  const vols = estado.ajustes.volumenes;
+  const umbral = estado.ajustes.stockBajo;
+  const lista = [...estado.perfumes]
+    .sort((a, b) => a.marca.localeCompare(b.marca, "es") || a.nombre.localeCompare(b.nombre, "es"))
+    .filter((p) => !soloBajo || vols.some((v) => stock(p, v) <= umbral));
+  const bajos = estado.perfumes.filter((p) => vols.some((v) => stock(p, v) <= umbral)).length;
+
+  $("#vista").innerHTML = `
+    <section class="tarjeta">
+      <div class="lista-cabecera">
+        <label class="check"><input type="checkbox" id="inv-bajo" ${soloBajo ? "checked" : ""} /> Solo stock bajo (≤ ${umbral}) · ${bajos}</label>
+        <button type="button" class="btn" id="inv-csv">Exportar CSV</button>
+      </div>
+      <div class="tabla-scroll">
+        <table class="tabla-inv">
+          <thead><tr><th>Perfume</th>${vols.map((v) => `<th>${v} ml</th>`).join("")}</tr></thead>
+          <tbody>
+            ${lista
+              .map(
+                (p) => `<tr>
+              <td><strong>${esc(p.nombre)}</strong><small>${esc(p.marca)}</small></td>
+              ${vols
+                .map((v) => {
+                  const n = stock(p, v);
+                  return `<td><input type="number" min="0" inputmode="numeric" class="${n <= umbral ? "bajo" : ""}" data-id="${esc(p.id)}" data-v="${v}" value="${n}" aria-label="${esc(p.nombre)} ${v} ml" /></td>`;
+                })
+                .join("")}
+            </tr>`,
+              )
+              .join("")}
+          </tbody>
+        </table>
+      </div>
+    </section>
+    <section class="tarjeta">
+      <div class="lista-cabecera"><h2>Historial de impresiones</h2>
+        ${estado.historial.length ? `<button type="button" class="btn" id="hist-borrar">Vaciar</button>` : ""}
+      </div>
+      <ul class="historial">
+        ${
+          estado.historial.length
+            ? estado.historial
+                .slice(0, 100)
+                .map(
+                  (h) => `<li>
+            <span><strong>${esc(h.nombre)}</strong> · ${esc(formatoVolumen(h.volumen))} × ${h.cantidad}
+              <small>${new Date(h.fecha).toLocaleString("es")}${h.descontado ? ` · −${h.descontado} del stock` : ""}</small></span>
+            ${h.descontado && h.perfumeId ? `<button type="button" class="btn" data-deshacer="${esc(h.id)}">Deshacer</button>` : ""}
+          </li>`,
+                )
+                .join("")
+            : `<li class="vacio-lista">Aún no hay impresiones.</li>`
+        }
+      </ul>
+    </section>`;
+
+  $<HTMLInputElement>("#inv-bajo").addEventListener("change", (e) => {
+    soloBajo = (e.target as HTMLInputElement).checked;
+    vistaInventario();
+  });
+  $("#inv-csv").addEventListener("click", () =>
+    descargarTexto("inventario-decants.csv", perfumesACsv(estado.perfumes, vols), "text/csv"),
+  );
+  $$<HTMLInputElement>(".tabla-inv input").forEach((inp) =>
+    inp.addEventListener("change", () => {
+      const p = estado.perfumes.find((x) => x.id === inp.dataset.id);
+      if (!p) return;
+      const n = Math.max(0, parseInt(inp.value, 10) || 0);
+      p.inventario[inp.dataset.v!] = n;
+      inp.value = String(n);
+      inp.classList.toggle("bajo", n <= umbral);
+      guardarPerfumes();
+    }),
+  );
+  $$("[data-deshacer]").forEach((b) =>
+    b.addEventListener("click", () => {
+      const h = estado.historial.find((x) => x.id === b.dataset.deshacer);
+      const p = estado.perfumes.find((x) => x.id === h?.perfumeId);
+      if (!h || !p) return;
+      p.inventario[h.volumen] = stock(p, h.volumen) + h.descontado;
+      h.descontado = 0;
+      guardarPerfumes();
+      guardarHistorial();
+      aviso("Stock restaurado");
+      vistaInventario();
+    }),
+  );
+  document.getElementById("hist-borrar")?.addEventListener("click", () => {
+    if (!confirm("¿Vaciar el historial de impresiones?")) return;
+    estado.historial = [];
+    guardarHistorial();
+    vistaInventario();
+  });
+}
+
+// ---------- ajustes ----------
+
+function vistaAjustes(): void {
+  const a = estado.ajustes;
+  const marcas = marcasDelCatalogo();
+  const ejemplo: DatosEtiqueta = estado.perfumes[0]
+    ? { nombre: estado.perfumes[0].nombre, marca: estado.perfumes[0].marca, volumen: String(a.volumenes[1] ?? 5) }
+    : { nombre: "Nombre del perfume", marca: "Marca", volumen: "5" };
+
+  $("#vista").innerHTML = `
+    <section class="tarjeta ajustes-etiqueta">
+      <div class="formulario">
+        <h2>Etiqueta</h2>
+        <div class="segmentado" id="a-diseno">
+          <button type="button" data-d="vertical" class="${a.diseno === "vertical" ? "activa" : ""}">Vertical</button>
+          <button type="button" data-d="horizontal" class="${a.diseno === "horizontal" ? "activa" : ""}">Horizontal</button>
+        </div>
+        <label class="check"><input type="checkbox" data-a="marco" ${a.marco ? "checked" : ""} /> Marco decorativo</label>
+        <label class="check"><input type="checkbox" data-a="mayusculas" ${a.mayusculas ? "checked" : ""} /> Nombre en mayúsculas</label>
+        <label class="check"><input type="checkbox" data-a="invertir" ${a.invertir ? "checked" : ""} /> Girar 180° (si sale al revés)</label>
+        <label>Densidad de impresión
+          <select id="a-densidad">${[1, 2, 3].map((d) => `<option value="${d}" ${d === a.densidad ? "selected" : ""}>${d}${d === 2 ? " (normal)" : d === 3 ? " (más oscuro)" : " (claro)"}</option>`).join("")}</select>
+        </label>
+      </div>
+      <figure class="vista-previa"><canvas id="a-previa"></canvas><figcaption>Ejemplo</figcaption></figure>
+    </section>
+
+    <section class="tarjeta">
+      <h2>Logo de la tienda</h2>
+      <div class="logo-tienda">
+        <span class="logo-caja"><img src="${esc(urlLogoTienda())}" alt="Logo de la tienda" /></span>
+        <div class="acciones-sec">
+          <button type="button" class="btn" id="a-logo-subir">Cambiar logo</button>
+          ${a.logoTienda ? `<button type="button" class="btn" id="a-logo-quitar">Usar el logo incluido</button>` : ""}
+        </div>
+      </div>
+      <p class="ayuda">Acepta PNG, JPG, WEBP o SVG. Se recorta al contenido y se convierte a blanco y negro.</p>
+    </section>
+
+    <section class="tarjeta">
+      <h2>Logos de marcas</h2>
+      <p class="ayuda">Las marcas sin logo se imprimen con su nombre en texto.</p>
+      <ul class="logos-marca">
+        ${marcas
+          .map((m) => {
+            const url = urlLogoMarca(m);
+            const propio = !!a.logosMarca[slugMarca(m)];
+            return `<li>
+              <span class="logo-caja">${url ? `<img src="${esc(url)}" alt="" loading="lazy" />` : `<span class="sin-logo">Sin logo</span>`}</span>
+              <span class="nombre-marca">${esc(m)}</span>
+              <span class="acciones-sec">
+                <button type="button" class="btn" data-subir="${esc(m)}">${url ? "Cambiar" : "Subir"}</button>
+                ${propio ? `<button type="button" class="btn" data-quitar="${esc(m)}">Quitar</button>` : ""}
+              </span>
+            </li>`;
+          })
+          .join("")}
+      </ul>
+    </section>
+
+    <section class="tarjeta formulario">
+      <h2>Inventario</h2>
+      <label>Volúmenes en ml <small>(separados por coma)</small><input id="a-vols" value="${esc(a.volumenes.join(", "))}" /></label>
+      <label>Avisar stock bajo cuando quede<input id="a-bajo" type="number" min="0" value="${a.stockBajo}" inputmode="numeric" /></label>
+    </section>
+
+    <section class="tarjeta">
+      <h2>Datos</h2>
+      <div class="acciones-sec envolver">
+        <button type="button" class="btn" id="d-respaldo">Descargar respaldo (JSON)</button>
+        <button type="button" class="btn" id="d-restaurar">Restaurar respaldo</button>
+        <button type="button" class="btn" id="d-csv-in">Importar CSV</button>
+        <button type="button" class="btn" id="d-csv-out">Exportar CSV</button>
+        <button type="button" class="btn peligro" id="d-reset">Restaurar catálogo inicial</button>
+      </div>
+      <p class="ayuda">CSV: columnas <code>nombre, marca, genero, nota, stock_3, stock_5…</code>. Los perfumes importados se agregan al catálogo.</p>
+    </section>`;
+
+  const previa = $<HTMLCanvasElement>("#a-previa");
+  const repintar = () => void pintarVistaPrevia(previa, ejemplo);
+  repintar();
+
+  $$("#a-diseno button").forEach((b) =>
+    b.addEventListener("click", () => {
+      a.diseno = b.dataset.d as typeof a.diseno;
+      $$("#a-diseno button").forEach((x) => x.classList.toggle("activa", x === b));
+      guardarAjustes();
+      repintar();
+    }),
+  );
+  $$<HTMLInputElement>("[data-a]").forEach((inp) =>
+    inp.addEventListener("change", () => {
+      (a as unknown as Record<string, boolean>)[inp.dataset.a!] = inp.checked;
+      guardarAjustes();
+      repintar();
+    }),
+  );
+  $<HTMLSelectElement>("#a-densidad").addEventListener("change", (e) => {
+    a.densidad = Number((e.target as HTMLSelectElement).value);
+    guardarAjustes();
+  });
+  $<HTMLInputElement>("#a-vols").addEventListener("change", (e) => {
+    const vols = (e.target as HTMLInputElement).value
+      .split(/[,;\s]+/)
+      .map(Number)
+      .filter((n) => n > 0);
+    a.volumenes = vols.length ? [...new Set(vols)].sort((x, y) => x - y) : AJUSTES_DEFECTO.volumenes;
+    guardarAjustes();
+    aviso("Volúmenes guardados");
+  });
+  $<HTMLInputElement>("#a-bajo").addEventListener("change", (e) => {
+    a.stockBajo = Math.max(0, parseInt((e.target as HTMLInputElement).value, 10) || 0);
+    guardarAjustes();
+  });
+
+  const subirLogo = async (alGuardar: (dataUrl: string) => void) => {
+    const archivo = await leerArchivo("image/*");
+    if (!archivo) return;
+    try {
+      alGuardar(await procesarLogoSubido(archivo));
+      guardarAjustes();
+      aviso("Logo actualizado");
+      vistaAjustes();
+    } catch (e) {
+      aviso(mensajeError(e), "error");
+    }
+  };
+  $("#a-logo-subir").addEventListener("click", () => subirLogo((d) => (a.logoTienda = d)));
+  document.getElementById("a-logo-quitar")?.addEventListener("click", () => {
+    a.logoTienda = null;
+    guardarAjustes();
+    vistaAjustes();
+  });
+  $$("[data-subir]").forEach((b) =>
+    b.addEventListener("click", () => subirLogo((d) => (a.logosMarca[slugMarca(b.dataset.subir!)] = d))),
+  );
+  $$("[data-quitar]").forEach((b) =>
+    b.addEventListener("click", () => {
+      delete a.logosMarca[slugMarca(b.dataset.quitar!)];
+      guardarAjustes();
+      vistaAjustes();
+    }),
+  );
+
+  $("#d-respaldo").addEventListener("click", () =>
+    descargarTexto(
+      `respaldo-decants-${new Date().toISOString().slice(0, 10)}.json`,
+      JSON.stringify({ version: 1, ...estado }, null, 2),
+      "application/json",
+    ),
+  );
+  $("#d-restaurar").addEventListener("click", async () => {
+    const archivo = await leerArchivo(".json,application/json");
+    if (!archivo) return;
+    try {
+      const datos = JSON.parse(await archivo.text());
+      if (!Array.isArray(datos.perfumes)) throw new Error("El archivo no es un respaldo válido");
+      if (!confirm(`Se reemplazará el catálogo actual por ${datos.perfumes.length} perfumes. ¿Continuar?`)) return;
+      estado.perfumes = datos.perfumes;
+      estado.ajustes = { ...AJUSTES_DEFECTO, ...(datos.ajustes ?? {}) };
+      estado.historial = datos.historial ?? [];
+      guardarPerfumes();
+      guardarAjustes();
+      guardarHistorial();
+      aviso("Respaldo restaurado");
+      vistaAjustes();
+    } catch (e) {
+      aviso(mensajeError(e), "error");
+    }
+  });
+  $("#d-csv-in").addEventListener("click", async () => {
+    const archivo = await leerArchivo(".csv,text/csv");
+    if (!archivo) return;
+    try {
+      const nuevos = perfumesDesdeCsv(await archivo.text());
+      const existe = new Set(estado.perfumes.map((p) => slugMarca(`${p.marca} ${p.nombre}`)));
+      const agregar = nuevos.filter((p) => !existe.has(slugMarca(`${p.marca} ${p.nombre}`)));
+      estado.perfumes.push(...agregar);
+      guardarPerfumes();
+      aviso(`${agregar.length} perfumes agregados${nuevos.length - agregar.length ? ` (${nuevos.length - agregar.length} repetidos omitidos)` : ""}`);
+      vistaAjustes();
+    } catch (e) {
+      aviso(mensajeError(e), "error");
+    }
+  });
+  $("#d-csv-out").addEventListener("click", () =>
+    descargarTexto("catalogo-decants.csv", perfumesACsv(estado.perfumes, a.volumenes), "text/csv"),
+  );
+  $("#d-reset").addEventListener("click", () => {
+    if (!confirm("Se reemplazará el catálogo (y su stock) por el catálogo inicial. ¿Continuar?")) return;
+    estado.perfumes = catalogoPorDefecto();
+    guardarPerfumes();
+    aviso("Catálogo restaurado");
+    vistaAjustes();
+  });
+}
+
+// ---------- arranque ----------
+
+async function iniciar(): Promise<void> {
+  await cargarLogosIncluidos();
+  let inicial: Vista = "catalogo";
+  try {
+    const v = sessionStorage.getItem("etq.vista") as Vista | null;
+    if (v && v in vistas) inicial = v;
+  } catch { /* sin almacenamiento */ }
+  irA(inicial);
+  if (!impresora.disponible) {
+    aviso("Este navegador no puede usar Bluetooth. Abre la app en Chrome (Android) o Chrome/Edge (PC).", "error");
+  }
+  if (import.meta.env.PROD && "serviceWorker" in navigator) {
+    navigator.serviceWorker.register("sw.js").catch(() => undefined);
+  }
+}
+
+void iniciar();
