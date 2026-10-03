@@ -1,7 +1,13 @@
 // Service worker: red primero y caché como respaldo, para que la app abra sin conexión.
-// La página se revalida siempre (cache: "no-cache") para que una versión nueva se vea al abrir la app;
-// los archivos de assets/ llevan un hash en el nombre, así que pueden usar la caché HTTP normal.
-const CACHE = "decants-v2";
+// La página se pide siempre fresca: GitHub Pages la guarda ~10 min en su CDN, así que se agrega un
+// parámetro único para saltarla. Los archivos de assets/ llevan un hash en el nombre y usan la caché normal.
+const CACHE = "decants-v3";
+
+function paginaFresca(request) {
+  const url = new URL(request.url);
+  url.searchParams.set("_v", Date.now().toString(36));
+  return fetch(url, { cache: "no-store", credentials: "same-origin" });
+}
 
 self.addEventListener("install", () => self.skipWaiting());
 self.addEventListener("activate", (e) =>
@@ -16,7 +22,7 @@ self.addEventListener("activate", (e) =>
 self.addEventListener("fetch", (e) => {
   const { request } = e;
   if (request.method !== "GET" || new URL(request.url).origin !== self.location.origin) return;
-  const deRed = request.mode === "navigate" ? fetch(request, { cache: "no-cache" }) : fetch(request);
+  const deRed = request.mode === "navigate" ? paginaFresca(request) : fetch(request);
   e.respondWith(
     deRed
       .then((resp) => {
