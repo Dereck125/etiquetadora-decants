@@ -548,6 +548,7 @@ function seccionU1(): string {
         <button type="button" class="btn" id="u1-conectar">${u1.conectada ? `Conectada: ${esc(u1.nombre)}` : "Conectar U1"}</button>
         <button type="button" class="btn primario" id="u1-imprimir">Imprimir prueba</button>
         <button type="button" class="btn" id="u1-regla">Imprimir regla</button>
+        <button type="button" class="btn" id="u1-avanzar">Avanzar a la siguiente etiqueta</button>
       </div>
       <p class="progreso" id="u1-progreso"></p>
       <div class="calibrador">
@@ -666,6 +667,19 @@ function enlazarU1(): void {
   $("#u1-regla").addEventListener("click", (e) =>
     imprimirU1(e.currentTarget as HTMLButtonElement, async () => lienzoReglaU1(o.altoMm)),
   );
+
+  $("#u1-avanzar").addEventListener("click", async (e) => {
+    const btn = e.currentTarget as HTMLButtonElement;
+    btn.disabled = true;
+    try {
+      await u1.avanzarAlHueco(o);
+      aviso("Avance enviado: debería detenerse al inicio de la siguiente etiqueta");
+    } catch (err) {
+      aviso(mensajeError(err), "error");
+    } finally {
+      btn.disabled = false;
+    }
+  });
 
   // ----- calibrador -----
   $("#cal-guia").addEventListener("click", (e) =>
