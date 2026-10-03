@@ -464,6 +464,7 @@ function abrirImpresion(p: Perfume): void {
           <button type="button" class="btn primario grande" id="i-imprimir">Imprimir en la ${nombreImpresora}</button>
           <p class="progreso" id="i-progreso"></p>
           <div class="acciones-sec">
+            ${modo === "grande" ? `<button type="button" class="btn" id="i-alinear" title="Avanza hasta el inicio de la siguiente etiqueta. Úsalo después de poner el rollo o encender la impresora.">Calibrar papel</button>` : ""}
             <button type="button" class="btn" id="i-editar">Editar perfume</button>
             <button type="button" class="btn" id="i-png">Descargar PNG</button>
           </div>
@@ -506,6 +507,19 @@ function abrirImpresion(p: Perfume): void {
       cant.value = String(Math.min(99, Math.max(1, (parseInt(cant.value, 10) || 1) + Number(b.dataset.paso))));
     }),
   );
+  document.getElementById("i-alinear")?.addEventListener("click", async (e) => {
+    const btn = e.currentTarget as HTMLButtonElement;
+    if (!confirm("Esto avanza hasta el inicio de la siguiente etiqueta (la que esté a medias se pierde). Úsalo después de poner el rollo o encender la impresora. ¿Continuar?")) return;
+    btn.disabled = true;
+    try {
+      await u1.avanzarAlHueco(estado.ajustes.u1);
+      aviso("Papel calibrado: la siguiente etiqueta saldrá completa");
+    } catch (err) {
+      aviso(mensajeError(err), "error");
+    } finally {
+      btn.disabled = false;
+    }
+  });
   $("#i-editar", dlg).addEventListener("click", () => {
     dlg.close();
     abrirEditor(p);
