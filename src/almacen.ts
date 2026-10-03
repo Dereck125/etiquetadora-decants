@@ -29,7 +29,8 @@ export const AJUSTES_DEFECTO: Ajustes = {
   resolucion: RESOLUCIONES[0],
   logoTienda: null,
   logosMarca: {},
-  u1: { ...OPCIONES_U1_DEFECTO, anchoMm: 40, altoMm: 20, desplazamiento: 0 },
+  // Desplazamiento medido en la primera prueba: la etiqueta queda ~4 mm a la derecha del centro.
+  u1: { ...OPCIONES_U1_DEFECTO, anchoMm: 40, altoMm: 20, desplazamiento: 32 },
 };
 
 function leer<T>(clave: string): T | null {
@@ -71,6 +72,11 @@ delete ajustesGuardados.diseno;
 
 const ajustesIniciales = { ...AJUSTES_DEFECTO, ...ajustesGuardados } as Ajustes;
 ajustesIniciales.u1 = { ...AJUSTES_DEFECTO.u1, ...(ajustesGuardados.u1 ?? {}) };
+// Configuración guardada antes de calibrar (sin inicioMm): se adopta el centrado medido.
+if (ajustesGuardados.u1 && (ajustesGuardados.u1 as Partial<Ajustes["u1"]>).inicioMm === undefined) {
+  ajustesIniciales.u1.desplazamiento = AJUSTES_DEFECTO.u1.desplazamiento;
+}
+delete (ajustesIniciales.u1 as unknown as Record<string, unknown>).retroceso;
 
 export const estado = {
   perfumes: (leer<Perfume[]>(CLAVES.perfumes) ?? catalogoPorDefecto()).map(limpiarPerfume),

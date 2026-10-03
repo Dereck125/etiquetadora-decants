@@ -37,8 +37,11 @@ export interface OpcionesU1 {
    * El perfil "u1" de TiMini usa 40 puntos = 5 mm ("back_paper_num").
    */
   extraMm: number;
-  /** Retroceder ese avance extra antes de imprimir: "auto" = solo si la impresión anterior lo hizo. */
-  retroceso: "auto" | "siempre" | "nunca";
+  /**
+   * Cuánto queda adelantada la etiqueta respecto al cabezal después de buscar el hueco. Se retrocede
+   * antes de imprimir para empezar en el borde. Medido en la primera prueba: ~4.5 mm.
+   */
+  inicioMm: number;
 }
 
 export const OPCIONES_U1_DEFECTO: OpcionesU1 = {
@@ -48,7 +51,7 @@ export const OPCIONES_U1_DEFECTO: OpcionesU1 = {
   modoBE: 0,
   bloque: 100,
   extraMm: 5,
-  retroceso: "auto",
+  inicioMm: 4.5,
 };
 
 // ---------- paquetes ----------
@@ -115,17 +118,18 @@ export function empacarLinea(linea: Uint8Array): number[] {
 
 /**
  * Arma el trabajo completo de una etiqueta a partir de un canvas de 384 de ancho.
- * @param retroceder si hay que regresar primero el avance extra de la impresión anterior.
+ * @param retrocesoMm cuánto regresar el papel antes de imprimir (ver {@link retrocesoU1}).
  */
-export function trabajoU1(lienzo: HTMLCanvasElement, o: OpcionesU1, retroceder = false): Uint8Array {
+export function trabajoU1(lienzo: HTMLCanvasElement, o: OpcionesU1, retrocesoMm = 0): Uint8Array {
   if (lienzo.width !== U1_ANCHO) throw new Error(`El lienzo debe medir ${U1_ANCHO} px de ancho`);
   const { width: w, height: h } = lienzo;
   const px = lienzo.getContext("2d", { willReadFrequently: true })!.getImageData(0, 0, w, h).data;
   const VELOCIDAD = 10;
   const extra = Math.round(Math.max(0, o.extraMm) * U1_PX_MM);
+  const retroceso = Math.round(Math.max(0, retrocesoMm) * U1_PX_MM);
   const partes: Uint8Array[] = [
     // A0 = retroceder papel (u16 LE en puntos), para empezar justo en el borde de la etiqueta.
-    ...(retroceder && extra > 0 ? [paquete(0xa0, u16(extra))] : []),
+    ...(retroceso > 0 ? [paquete(0xa0, u16(retroceso))] : []),
     paquete(0xa4, [0x30 + Math.min(5, Math.max(1, o.densidad))]),
     paquete(0xaf, u16(20000)),
     paquete(0xbe, [o.modoBE]),
@@ -172,6 +176,15 @@ export function trabajoU1(lienzo: HTMLCanvasElement, o: OpcionesU1, retroceder =
 const esperar = (ms: number) => new Promise((r) => setTimeout(r, ms));
 const hex = (d: DataView) =>
   Array.from(new Uint8Array(d.buffer, d.byteOffset, d.byteLength), (b) => b.toString(16).padStart(2, "0")).join(" ");
+
+/**
+ * Retroceso antes de imprimir: tras buscar el hueco la etiqueta queda `inicioMm` adelantada, y si la
+ * anterior avanzó `extraMm` para arrancarla, también eso. Solo aplica al avance por hueco.
+ */
+export function retrocesoU1(o: OpcionesU1, anteriorAdelantada: boolean): number {
+  if (o.avance !== "hueco") return 0;
+  return Math.max(0, o.inicioMm) + (anteriorAdelantada ? Math.max(0, o.extraMm) : 0);
+}
 
 /** Recuerda (aunque se cierre la app) si la última etiqueta quedó adelantada para arrancarla. */
 const CLAVE_ADELANTADA = "u1-adelantada";
@@ -253,9 +266,7 @@ class ImpresoraU1 {
     if (!this.conectada) await this.conectar();
     const adelanta = o.avance === "hueco" && o.extraMm > 0;
     for (let c = 1; c <= copias; c++) {
-      const retroceder =
-        o.retroceso === "siempre" || (o.retroceso === "auto" && (c > 1 ? adelanta : leerAdelantada()));
-      const trabajo = trabajoU1(lienzo, o, retroceder);
+      const trabajo = trabajoU1(lienzo, o, retrocesoU1(o, c > 1 ? adelanta : leerAdelantada()));
       await this.enviar(trabajo, o.bloque, (n, t) =>
         progreso?.(`Enviando ${copias > 1 ? `copia ${c} de ${copias}, ` : ""}${Math.round((n / t) * 100)}%`),
       );
