@@ -103,10 +103,10 @@ test("Retroceso: inicio calibrado (3 mm) + avance extra de la etiqueta anterior 
 
 import { areaImprimibleU1 } from "../src/u1.ts";
 
-test("Área imprimible: si la etiqueta se sale del cabezal se encoge con el mismo margen a los lados", () => {
+test("Área imprimible: si la etiqueta se sale del cabezal solo se recorta ese lado", () => {
   assert.deepEqual(areaImprimibleU1(40, 0), { x: 32, ancho: 320 });
-  // Calibrada: x0 = 32 + 44 = 76 → termina en 396, 12 px fuera de los 384 → 12 px menos por lado.
-  assert.deepEqual(areaImprimibleU1(40, 44), { x: 88, ancho: 296 });
-  // Corrida a la izquierda: empieza en -8 → se recorta 8 por lado → de 0 a 304.
-  assert.deepEqual(areaImprimibleU1(40, -40), { x: 0, ancho: 304 });
+  // Calibrada: x0 = 32 + 44 = 76 → termina en 396, 12 px fuera → de 76 a 384.
+  assert.deepEqual(areaImprimibleU1(40, 44), { x: 76, ancho: 308 });
+  // Corrida a la izquierda: empieza en -8 → de 0 a 312.
+  assert.deepEqual(areaImprimibleU1(40, -40), { x: 0, ancho: 312 });
 });
