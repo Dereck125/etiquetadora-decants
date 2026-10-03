@@ -446,14 +446,23 @@ function abrirImpresion(p: Perfume): void {
             ${vols.map((v) => `<button type="button" data-v="${v}">${v} ml</button>`).join("")}
           </div>
           <div class="par" id="i-par" hidden>
-            <label class="check"><input type="checkbox" id="i-dos" ${ultimoDosEnUno ? "checked" : ""} /> 2 en 1: dos etiquetas cortas en una</label>
-            <label class="par-segunda" id="i-segunda-campo">Segunda etiqueta
+            <div class="par-opciones" role="radiogroup" aria-label="¿Cuántas etiquetas de 3 ml en una?">
+              <button type="button" class="par-opcion" data-par="1" role="radio">
+                <span class="par-dibujo"><i></i></span>
+                <b>1 etiqueta</b><small>una sola</small>
+              </button>
+              <button type="button" class="par-opcion" data-par="2" role="radio">
+                <span class="par-dibujo"><i></i><i></i></span>
+                <b>2 en 1</b><small>ahorra papel</small>
+              </button>
+            </div>
+            <label class="par-segunda" id="i-segunda-campo">¿Qué perfume va abajo?
               <select id="i-segunda">
                 <option value="">El mismo perfume</option>
                 ${opcionesPerfumes()}
               </select>
+              <span class="par-tijera">✂ Córtala por la línea punteada</span>
             </label>
-            <small class="ayuda">Se imprimen una debajo de la otra, con una línea punteada para cortar.</small>
           </div>
           <label class="etiqueta-campo" for="i-cant">Cantidad de etiquetas</label>
           <div class="stepper">
@@ -475,18 +484,23 @@ function abrirImpresion(p: Perfume): void {
   const datos = (): DatosEtiqueta => ({ nombre: p.nombre, marca: p.marca, volumen });
   const canvas = $<HTMLCanvasElement>("#i-previa", dlg);
   const cant = $<HTMLInputElement>("#i-cant", dlg);
-  const dos = $<HTMLInputElement>("#i-dos", dlg);
+  let dosEnUno = ultimoDosEnUno;
   const segunda = $<HTMLSelectElement>("#i-segunda", dlg);
   /** Segunda etiqueta del "2 en 1" (null si no aplica). */
   const pareja = (): DatosEtiqueta | null => {
-    if (!esCorta(volumen, estado.ajustes) || !dos.checked) return null;
+    if (!esCorta(volumen, estado.ajustes) || !dosEnUno) return null;
     const otro = estado.perfumes.find((x) => x.id === segunda.value) ?? p;
     return { nombre: otro.nombre, marca: otro.marca, volumen };
   };
   const actualizar = () => {
     $$("#i-vol button", dlg).forEach((b) => b.classList.toggle("activa", b.dataset.v === volumen));
     $("#i-par", dlg).hidden = !esCorta(volumen, estado.ajustes);
-    $("#i-segunda-campo", dlg).hidden = !dos.checked;
+    $("#i-segunda-campo", dlg).hidden = !dosEnUno;
+    $$(".par-opcion", dlg).forEach((b) => {
+      const activa = (b.dataset.par === "2") === dosEnUno;
+      b.classList.toggle("activa", activa);
+      b.setAttribute("aria-checked", String(activa));
+    });
     void pintarVistaPrevia(canvas, datos(), pareja());
   };
   actualizar();
@@ -497,10 +511,12 @@ function abrirImpresion(p: Perfume): void {
       actualizar();
     }),
   );
-  dos.addEventListener("change", () => {
-    ultimoDosEnUno = dos.checked;
-    actualizar();
-  });
+  $$(".par-opcion", dlg).forEach((b) =>
+    b.addEventListener("click", () => {
+      dosEnUno = ultimoDosEnUno = b.dataset.par === "2";
+      actualizar();
+    }),
+  );
   segunda.addEventListener("change", actualizar);
   $$(".stepper button", dlg).forEach((b) =>
     b.addEventListener("click", () => {
