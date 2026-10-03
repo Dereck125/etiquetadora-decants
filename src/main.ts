@@ -602,7 +602,11 @@ function seccionU1(): string {
       <div class="u1-grid">
         <label>Ancho (mm)<input type="number" data-u1="anchoMm" value="${o.anchoMm}" min="15" max="48" /></label>
         <label>Alto (mm)<input type="number" data-u1="altoMm" value="${o.altoMm}" min="10" max="100" /></label>
-        <label>Desplazamiento (px, 8 = 1 mm)<select data-u1="desplazamiento">${opc([-48, -40, -32, -24, -16, -8, 0, 8, 16, 24, 32, 40, 48], o.desplazamiento)}</select></label>
+        <label>Desplazamiento (px, 8 = 1 mm)<select data-u1="desplazamiento">${opc(
+          // Pasos de 4 px (½ mm), e incluye siempre el valor actual (la calibración puede dar cualquiera).
+          [...new Set([...Array.from({ length: 33 }, (_, i) => (i - 16) * 4), o.desplazamiento])].sort((a, b) => a - b),
+          o.desplazamiento,
+        )}</select></label>
         <label>Densidad<select data-u1="densidad">${opc([1, 2, 3, 4, 5], o.densidad)}</select></label>
         <label>Energía (calor)<select data-u1="energia">${opc([8000, 10000, 12000, 14000, 16000, 20000], o.energia, (v) =>
           `${v}${Number(v) === 20000 ? " (original)" : Number(v) === 12000 ? " (más rápido)" : ""}`)}</select></label>
