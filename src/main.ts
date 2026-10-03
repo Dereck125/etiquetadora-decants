@@ -587,6 +587,10 @@ function seccionU1(): string {
         <label>Alto (mm)<input type="number" data-u1="altoMm" value="${o.altoMm}" min="10" max="100" /></label>
         <label>Desplazamiento (px, 8 = 1 mm)<select data-u1="desplazamiento">${opc([-48, -40, -32, -24, -16, -8, 0, 8, 16, 24, 32, 40, 48], o.desplazamiento)}</select></label>
         <label>Densidad<select data-u1="densidad">${opc([1, 2, 3, 4, 5], o.densidad)}</select></label>
+        <label>Energía (calor)<select data-u1="energia">${opc([8000, 10000, 12000, 14000, 16000, 20000], o.energia, (v) =>
+          `${v}${Number(v) === 20000 ? " (original)" : Number(v) === 12000 ? " (más rápido)" : ""}`)}</select></label>
+        <label>Velocidad <small>(menor = más rápido)</small><select data-u1="velocidad">${opc([5, 6, 8, 10, 15, 20], o.velocidad, (v) =>
+          `${v}${Number(v) === 10 ? " (original)" : ""}`)}</select></label>
         <label>Avance al terminar<select data-u1="avance">${opc(Object.keys(avances), o.avance, (v) => avances[String(v)])}</select></label>
         <label>mm de avance<input type="number" data-u1="avanceMm" value="${o.avanceMm}" min="0" max="60" /></label>
         <label>Modo BE<select data-u1="modoBE">${opc([0, 1], o.modoBE, (v) => (Number(v) === 0 ? "0 (imagen)" : "1 (texto/etiqueta)"))}</select></label>
