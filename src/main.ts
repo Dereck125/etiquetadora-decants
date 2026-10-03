@@ -645,6 +645,10 @@ function enlazarU1(): void {
         clave === "avance" ? el.value : Number(el.value);
       guardarAjustes();
       previa();
+      // Confirmación visible: el valor se guarda al salir del campo (o al elegir en la lista).
+      const nombre = el.closest("label")?.firstChild?.textContent?.trim() || clave;
+      const valor = el instanceof HTMLSelectElement ? el.selectedOptions[0]?.textContent : el.value;
+      aviso(`Guardado: ${nombre} = ${valor}`);
     }),
   );
   const avisos = document.getElementById("u1-avisos");
