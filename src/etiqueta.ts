@@ -148,8 +148,7 @@ function marco(ctx: CanvasRenderingContext2D, w: number, h: number): void {
 }
 
 /** Separador ornamental horizontal: ——◆——. */
-function separador(ctx: CanvasRenderingContext2D, cy: number, largo: number) {
-  const cx = BASE_ANCHO / 2;
+function separador(ctx: CanvasRenderingContext2D, cy: number, largo: number, cx = BASE_ANCHO / 2) {
   const brazo = largo / 2 - 5;
   ctx.fillStyle = "#000";
   ctx.fillRect(cx - largo / 2, cy, brazo, 1);
@@ -287,6 +286,58 @@ export async function renderizarEtiqueta(
     dibujarCompleta(ctx, nombre(datos), datos, logos, L, ajustes.marco);
   }
 
+  binarizar(c);
+  return c;
+}
+
+/**
+ * Etiqueta horizontal para la impresora grande (U1), p. ej. 40 × 20 mm para 30 ml:
+ * nombre arriba, separador y abajo la marca (logo o texto) con el volumen en píldora.
+ * Se dibuja a `ancho` × `alto` puntos (8 px/mm) y ya en blanco y negro puro.
+ */
+export async function renderizarEtiquetaHorizontal(
+  datos: DatosEtiqueta,
+  ajustes: Ajustes,
+  ancho: number,
+  alto: number,
+): Promise<HTMLCanvasElement> {
+  await prepararFuente();
+  const logoMarca = await cargarImagen(urlLogoMarca(datos.marca));
+  const c = document.createElement("canvas");
+  c.width = ancho;
+  c.height = alto;
+  const ctx = c.getContext("2d", { willReadFrequently: true })!;
+  ctx.fillStyle = "#fff";
+  ctx.fillRect(0, 0, ancho, alto);
+
+  const nombre = ajustes.mayusculas ? datos.nombre.toUpperCase() : datos.nombre;
+  const m = 12; // margen interior (el marco ocupa ~7 px)
+  const altoNombre = Math.round(alto * 0.44);
+  dibujarTexto(ctx, nombre, { x: m, y: m, w: ancho - 2 * m, h: altoNombre }, { max: 40, min: 12, maxLineas: 2 });
+
+  const ySep = m + altoNombre + 5;
+  separador(ctx, ySep, Math.round(ancho * 0.5), ancho / 2);
+
+  const yFila = ySep + 7;
+  const altoFila = alto - m - yFila;
+  const volumen = formatoVolumen(datos.volumen);
+  const anchoPildora = volumen ? Math.min(96, Math.round(ancho * 0.3)) : 0;
+  dibujarMarca(ctx, logoMarca, datos.marca, {
+    x: m + 2,
+    y: yFila,
+    w: ancho - 2 * m - 4 - (anchoPildora ? anchoPildora + 12 : 0),
+    h: altoFila,
+  });
+  if (volumen) {
+    const altoPildora = Math.min(30, altoFila);
+    pildoraVolumen(
+      ctx,
+      volumen,
+      { x: ancho - m - 2 - anchoPildora, y: yFila + (altoFila - altoPildora) / 2, w: anchoPildora, h: altoPildora },
+      22,
+    );
+  }
+  if (ajustes.marco) marco(ctx, ancho, alto);
   binarizar(c);
   return c;
 }
