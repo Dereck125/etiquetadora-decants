@@ -172,6 +172,8 @@ input:focus-visible, select:focus-visible, button:focus-visible { outline: 2px s
 @media (min-width: 640px) { .imprimir-cuerpo { grid-template-columns: auto 1fr; align-items: start; } }
 .controles { display: grid; gap: 10px; }
 .etiqueta-campo { font-weight: 600; font-size: 0.9rem; }
+.par:not([hidden]) { display: grid; gap: 8px; padding: 12px; border: 1px dashed var(--borde); border-radius: 12px; }
+.par-segunda:not([hidden]) { display: grid; gap: 4px; font-weight: 600; font-size: 0.9rem; }
 .stepper { display: grid; grid-template-columns: 48px 1fr 48px; gap: 6px; }
 .stepper button { border: 1px solid var(--borde); background: var(--superficie-2); border-radius: 10px; font-size: 1.3rem; cursor: pointer; }
 .stepper input { text-align: center; font-size: 1.1rem; font-weight: 700; }

@@ -14,7 +14,7 @@ import {
   reemplazarPerfumes,
 } from "./almacen";
 import { descargarTexto, perfumesACsv, perfumesDesdeCsv } from "./csv";
-import { lienzoImpresion, renderizarEtiqueta } from "./etiqueta";
+import { esCorta, lienzoImpresion, renderizarEtiqueta } from "./etiqueta";
 import { impresora } from "./impresora";
 import { cargarLogosIncluidos, procesarLogoSubido, slugMarca, urlLogoMarca, urlLogoTienda } from "./marcas";
 import { GENEROS, type DatosEtiqueta, type Genero, type Perfume } from "./tipos";
@@ -72,10 +72,14 @@ function leerArchivo(acepta: string): Promise<File | null> {
 
 /** Dibuja la etiqueta en un canvas visible (vista previa). Evita carreras entre renders. */
 const versionesPrevia = new WeakMap<HTMLCanvasElement, number>();
-async function pintarVistaPrevia(destino: HTMLCanvasElement, datos: DatosEtiqueta): Promise<HTMLCanvasElement> {
+async function pintarVistaPrevia(
+  destino: HTMLCanvasElement,
+  datos: DatosEtiqueta,
+  pareja?: DatosEtiqueta | null,
+): Promise<HTMLCanvasElement> {
   const v = (versionesPrevia.get(destino) ?? 0) + 1;
   versionesPrevia.set(destino, v);
-  const etiqueta = await renderizarEtiqueta(datos, estado.ajustes);
+  const etiqueta = await renderizarEtiqueta(datos, estado.ajustes, pareja);
   if (versionesPrevia.get(destino) === v) {
     destino.width = etiqueta.width;
     destino.height = etiqueta.height;
@@ -84,8 +88,8 @@ async function pintarVistaPrevia(destino: HTMLCanvasElement, datos: DatosEtiquet
   return etiqueta;
 }
 
-async function descargarPng(datos: DatosEtiqueta): Promise<void> {
-  const etiqueta = await renderizarEtiqueta(datos, estado.ajustes);
+async function descargarPng(datos: DatosEtiqueta, pareja?: DatosEtiqueta | null): Promise<void> {
+  const etiqueta = await renderizarEtiqueta(datos, estado.ajustes, pareja);
   const a = document.createElement("a");
   a.href = etiqueta.toDataURL("image/png");
   a.download = `etiqueta-${slugMarca(datos.nombre) || "decant"}-${slugMarca(datos.volumen)}.png`;
@@ -135,12 +139,13 @@ async function imprimir(
   datos: DatosEtiqueta,
   cantidad: number,
   progreso?: (t: string) => void,
+  pareja?: DatosEtiqueta | null,
 ): Promise<boolean> {
   try {
     // Conectar primero: Chrome solo abre el selector Bluetooth justo después de un toque.
     if (impresora.estado === "desconectada") await impresora.conectar();
     sincronizarResolucion();
-    const etiqueta = await renderizarEtiqueta(datos, estado.ajustes);
+    const etiqueta = await renderizarEtiqueta(datos, estado.ajustes, pareja);
     await impresora.imprimir(lienzoImpresion(etiqueta, estado.ajustes), cantidad, estado.ajustes.densidad, (p, t) =>
       progreso?.(`Imprimiendo ${Math.min(p + 1, t)} de ${t}…`),
     );
@@ -148,7 +153,8 @@ async function imprimir(
     aviso("No se pudo imprimir: " + mensajeError(e), "error");
     return false;
   }
-  aviso(`Listo: ${cantidad} etiqueta${cantidad === 1 ? "" : "s"} de ${datos.nombre}`);
+  const de = pareja ? `${datos.nombre} + ${pareja.nombre} (2 en 1)` : datos.nombre;
+  aviso(`Listo: ${cantidad} etiqueta${cantidad === 1 ? "" : "s"} de ${de}`);
   return true;
 }
 
@@ -256,6 +262,28 @@ function vistaCatalogo(): void {
 
 /** Último volumen elegido: se propone de nuevo al abrir otro perfume. */
 let ultimoVolumen = "";
+/** Si la última vez se usó "2 en 1" con las etiquetas cortas. */
+let ultimoDosEnUno = false;
+
+/** Opciones del selector de segunda etiqueta, agrupadas por marca. */
+function opcionesPerfumes(): string {
+  const porMarca = new Map<string, Perfume[]>();
+  for (const x of [...estado.perfumes].sort((a, b) => a.nombre.localeCompare(b.nombre, "es"))) {
+    const lista = porMarca.get(x.marca) ?? [];
+    lista.push(x);
+    porMarca.set(x.marca, lista);
+  }
+  return [...porMarca.keys()]
+    .sort((a, b) => a.localeCompare(b, "es"))
+    .map(
+      (m) =>
+        `<optgroup label="${esc(m || "Sin marca")}">${porMarca
+          .get(m)!
+          .map((x) => `<option value="${esc(x.id)}">${esc(x.nombre)}</option>`)
+          .join("")}</optgroup>`,
+    )
+    .join("");
+}
 
 function abrirImpresion(p: Perfume): void {
   const dlg = $<HTMLDialogElement>("#dlg-imprimir");
@@ -274,6 +302,16 @@ function abrirImpresion(p: Perfume): void {
           <label class="etiqueta-campo">Volumen</label>
           <div class="segmentado volumenes" id="i-vol">
             ${vols.map((v) => `<button type="button" data-v="${v}">${v} ml</button>`).join("")}
+          </div>
+          <div class="par" id="i-par" hidden>
+            <label class="check"><input type="checkbox" id="i-dos" ${ultimoDosEnUno ? "checked" : ""} /> 2 en 1: dos etiquetas cortas en una</label>
+            <label class="par-segunda" id="i-segunda-campo">Segunda etiqueta
+              <select id="i-segunda">
+                <option value="">El mismo perfume</option>
+                ${opcionesPerfumes()}
+              </select>
+            </label>
+            <small class="ayuda">Se imprimen una debajo de la otra, con una línea punteada para cortar.</small>
           </div>
           <label class="etiqueta-campo" for="i-cant">Cantidad de etiquetas</label>
           <div class="stepper">
@@ -294,17 +332,33 @@ function abrirImpresion(p: Perfume): void {
   const datos = (): DatosEtiqueta => ({ nombre: p.nombre, marca: p.marca, volumen });
   const canvas = $<HTMLCanvasElement>("#i-previa", dlg);
   const cant = $<HTMLInputElement>("#i-cant", dlg);
-  const marcarVol = () => $$("#i-vol button", dlg).forEach((b) => b.classList.toggle("activa", b.dataset.v === volumen));
-  marcarVol();
-  void pintarVistaPrevia(canvas, datos());
+  const dos = $<HTMLInputElement>("#i-dos", dlg);
+  const segunda = $<HTMLSelectElement>("#i-segunda", dlg);
+  /** Segunda etiqueta del "2 en 1" (null si no aplica). */
+  const pareja = (): DatosEtiqueta | null => {
+    if (!esCorta(volumen, estado.ajustes) || !dos.checked) return null;
+    const otro = estado.perfumes.find((x) => x.id === segunda.value) ?? p;
+    return { nombre: otro.nombre, marca: otro.marca, volumen };
+  };
+  const actualizar = () => {
+    $$("#i-vol button", dlg).forEach((b) => b.classList.toggle("activa", b.dataset.v === volumen));
+    $("#i-par", dlg).hidden = !esCorta(volumen, estado.ajustes);
+    $("#i-segunda-campo", dlg).hidden = !dos.checked;
+    void pintarVistaPrevia(canvas, datos(), pareja());
+  };
+  actualizar();
 
   $$("#i-vol button", dlg).forEach((b) =>
     b.addEventListener("click", () => {
       volumen = ultimoVolumen = b.dataset.v!;
-      marcarVol();
-      void pintarVistaPrevia(canvas, datos());
+      actualizar();
     }),
   );
+  dos.addEventListener("change", () => {
+    ultimoDosEnUno = dos.checked;
+    actualizar();
+  });
+  segunda.addEventListener("change", actualizar);
   $$(".stepper button", dlg).forEach((b) =>
     b.addEventListener("click", () => {
       cant.value = String(Math.min(99, Math.max(1, (parseInt(cant.value, 10) || 1) + Number(b.dataset.paso))));
@@ -314,13 +368,18 @@ function abrirImpresion(p: Perfume): void {
     dlg.close();
     abrirEditor(p);
   });
-  $("#i-png", dlg).addEventListener("click", () => void descargarPng(datos()));
+  $("#i-png", dlg).addEventListener("click", () => void descargarPng(datos(), pareja()));
   $("#i-imprimir", dlg).addEventListener("click", async (e) => {
     const btn = e.currentTarget as HTMLButtonElement;
     const progreso = $("#i-progreso", dlg);
     btn.disabled = true;
     progreso.textContent = "Enviando a la impresora…";
-    const ok = await imprimir(datos(), Math.max(1, parseInt(cant.value, 10) || 1), (t) => (progreso.textContent = t));
+    const ok = await imprimir(
+      datos(),
+      Math.max(1, parseInt(cant.value, 10) || 1),
+      (t) => (progreso.textContent = t),
+      pareja(),
+    );
     btn.disabled = false;
     progreso.textContent = "";
     if (ok) dlg.close();

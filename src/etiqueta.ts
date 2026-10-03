@@ -192,17 +192,59 @@ export function formatoVolumen(v: number | string): string {
   return /^\d+([.,]\d+)?$/.test(s) ? `${s} ML` : s.toUpperCase();
 }
 
+/** En un "2 en 1", separación entre las dos etiquetas cortas (con la línea de corte en medio). */
+const MM_SEPARACION_PAR = 1;
+
+type Logos = { tienda: HTMLImageElement | null; marca: HTMLImageElement | null };
+
+/** Etiqueta corta de L px base de largo: logo, nombre y marca (sin volumen). */
+function dibujarCorta(ctx: CanvasRenderingContext2D, nombre: string, marca: string, logos: Logos, L: number, conMarco: boolean) {
+  if (logos.tienda) dibujarImagen(ctx, logos.tienda, { x: 9, y: 10, w: 78, h: 34 });
+  separador(ctx, 49, 56);
+  dibujarTexto(ctx, nombre, { x: 9, y: 54, w: 78, h: L - 102 }, { max: 26, min: 10, maxLineas: 4 });
+  separador(ctx, L - 43, 56);
+  dibujarMarca(ctx, logos.marca, marca, { x: 9, y: L - 38, w: 78, h: 30 });
+  if (conMarco) marco(ctx, BASE_ANCHO, L);
+}
+
+/** Etiqueta completa: el nombre absorbe la diferencia de largo; lo demás va anclado arriba o abajo. */
+function dibujarCompleta(ctx: CanvasRenderingContext2D, nombre: string, datos: DatosEtiqueta, logos: Logos, L: number, conMarco: boolean) {
+  if (logos.tienda) dibujarImagen(ctx, logos.tienda, { x: 9, y: 10, w: 78, h: 66 });
+  separador(ctx, 82, 64);
+  dibujarTexto(ctx, nombre, { x: 9, y: 88, w: 78, h: L - 196 }, { max: 34, min: 12, maxLineas: 6 });
+  separador(ctx, L - 102, 64);
+  dibujarMarca(ctx, logos.marca, datos.marca, { x: 9, y: L - 96, w: 78, h: 52 });
+  const volumen = formatoVolumen(datos.volumen);
+  if (volumen) pildoraVolumen(ctx, volumen, { x: 12, y: L - 38, w: 72, h: 28 }, 22);
+  if (conMarco) marco(ctx, BASE_ANCHO, L);
+}
+
+/** Línea punteada de corte entre las dos etiquetas de un "2 en 1". */
+function lineaCorte(ctx: CanvasRenderingContext2D, y: number): void {
+  ctx.fillStyle = "#000";
+  for (let x = 2; x < BASE_ANCHO - 2; x += 6) ctx.fillRect(x, Math.round(y), 3, 1);
+}
+
+async function cargarLogos(marca: string): Promise<Logos> {
+  const [tienda, logoMarca] = await Promise.all([cargarImagen(urlLogoTienda()), cargarImagen(urlLogoMarca(marca))]);
+  return { tienda, marca: logoMarca };
+}
+
 /**
  * Dibuja la etiqueta vertical a la resolución configurada, ya en blanco y negro puro.
- * Las etiquetas cortas solo generan la mitad superior (12 × 20 mm) y no llevan el volumen.
+ * - Normal: etiqueta completa con volumen (largo de impresión configurado, 38 mm por defecto).
+ * - Corta (p. ej. 3 ml): solo los 20 mm de arriba, sin volumen.
+ * - Corta con `pareja` ("2 en 1"): dos etiquetas cortas, una debajo de la otra, con línea de corte.
  */
-export async function renderizarEtiqueta(datos: DatosEtiqueta, ajustes: Ajustes): Promise<HTMLCanvasElement> {
+export async function renderizarEtiqueta(
+  datos: DatosEtiqueta,
+  ajustes: Ajustes,
+  pareja?: DatosEtiqueta | null,
+): Promise<HTMLCanvasElement> {
   await prepararFuente();
-  const [logoTienda, logoMarca] = await Promise.all([
-    cargarImagen(urlLogoTienda()),
-    cargarImagen(urlLogoMarca(datos.marca)),
-  ]);
-  const largoMm = largoImpresionMm(datos.volumen, ajustes);
+  const corta = esCorta(datos.volumen, ajustes);
+  const par = corta && pareja ? pareja : null;
+  const largoMm = par ? largoImpresionMm("", ajustes) : largoImpresionMm(datos.volumen, ajustes);
   const { ancho, largo } = dimensiones(ajustes.resolucion, largoMm);
   /** Largo en la cuadrícula base: 304 para 38 mm, 160 para la corta. */
   const L = Math.round(largoMm * BASE_PX_MM);
@@ -214,26 +256,22 @@ export async function renderizarEtiqueta(datos: DatosEtiqueta, ajustes: Ajustes)
   ctx.fillRect(0, 0, ancho, largo);
   ctx.scale(ancho / BASE_ANCHO, largo / L);
 
-  const nombre = ajustes.mayusculas ? datos.nombre.toUpperCase() : datos.nombre;
+  const nombre = (d: DatosEtiqueta) => (ajustes.mayusculas ? d.nombre.toUpperCase() : d.nombre);
+  const logos = await cargarLogos(datos.marca);
 
-  if (esCorta(datos.volumen, ajustes)) {
-    // 12 × 20 mm: logo, nombre y marca (sin volumen).
-    if (logoTienda) dibujarImagen(ctx, logoTienda, { x: 9, y: 10, w: 78, h: 34 });
-    separador(ctx, 49, 56);
-    dibujarTexto(ctx, nombre, { x: 9, y: 54, w: 78, h: 58 }, { max: 26, min: 10, maxLineas: 4 });
-    separador(ctx, 117, 56);
-    dibujarMarca(ctx, logoMarca, datos.marca, { x: 9, y: 122, w: 78, h: 30 });
-    if (ajustes.marco) marco(ctx, BASE_ANCHO, L);
+  if (par) {
+    const Lpar = Math.round(((largoMm - MM_SEPARACION_PAR) / 2) * BASE_PX_MM);
+    dibujarCorta(ctx, nombre(datos), datos.marca, logos, Lpar, ajustes.marco);
+    lineaCorte(ctx, L / 2);
+    const logosPar = await cargarLogos(par.marca);
+    ctx.save();
+    ctx.translate(0, L - Lpar);
+    dibujarCorta(ctx, nombre(par), par.marca, logosPar, Lpar, ajustes.marco);
+    ctx.restore();
+  } else if (corta) {
+    dibujarCorta(ctx, nombre(datos), datos.marca, logos, L, ajustes.marco);
   } else {
-    // Etiqueta completa: el nombre absorbe la diferencia de largo; lo demás va anclado arriba o abajo.
-    if (logoTienda) dibujarImagen(ctx, logoTienda, { x: 9, y: 10, w: 78, h: 66 });
-    separador(ctx, 82, 64);
-    dibujarTexto(ctx, nombre, { x: 9, y: 88, w: 78, h: L - 196 }, { max: 34, min: 12, maxLineas: 6 });
-    separador(ctx, L - 102, 64);
-    dibujarMarca(ctx, logoMarca, datos.marca, { x: 9, y: L - 96, w: 78, h: 52 });
-    const volumen = formatoVolumen(datos.volumen);
-    if (volumen) pildoraVolumen(ctx, volumen, { x: 12, y: L - 38, w: 72, h: 28 }, 22);
-    if (ajustes.marco) marco(ctx, BASE_ANCHO, L);
+    dibujarCompleta(ctx, nombre(datos), datos, logos, L, ajustes.marco);
   }
 
   binarizar(c);
