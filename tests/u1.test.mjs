@@ -89,6 +89,9 @@ test("Retroceso: inicio calibrado (3 mm) + avance extra de la etiqueta anterior 
   assert.equal(retrocesoU1(OPCIONES_U1_DEFECTO, false), 3);
   assert.equal(retrocesoU1(OPCIONES_U1_DEFECTO, true), 9);
   assert.equal(retrocesoU1({ ...OPCIONES_U1_DEFECTO, extraMm: 0 }, true), 3);
+  // Inicio negativo: retrocede menos que el avance extra; nunca menos de 0.
+  assert.equal(retrocesoU1({ ...OPCIONES_U1_DEFECTO, inicioMm: -2 }, true), 4);
+  assert.equal(retrocesoU1({ ...OPCIONES_U1_DEFECTO, inicioMm: -2 }, false), 0);
   assert.equal(retrocesoU1({ ...OPCIONES_U1_DEFECTO, avance: "fijo" }, true), 0);
   const t = Buffer.from(trabajoU1(lienzoFalso(1), OPCIONES_U1_DEFECTO, 5));
   const bd = Buffer.from(paquete(0xbd, [10]));
