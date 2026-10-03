@@ -116,6 +116,13 @@
     "archivo": "maison-alhambra.png"
   },
   {
+    "marca": "Nautica",
+    "claves": [
+      "nautica"
+    ],
+    "archivo": "nautica.png"
+  },
+  {
     "marca": "Prada",
     "claves": [
       "prada"
