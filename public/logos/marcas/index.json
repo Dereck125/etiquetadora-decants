@@ -5,7 +5,8 @@
       "afnan",
       "afnan-perfumes"
     ],
-    "archivo": "afnan.png"
+    "archivo": "afnan.png",
+    "v": "a74fa966"
   },
   {
     "marca": "Al Haramain",
@@ -13,28 +14,32 @@
       "al-haramain",
       "al-haramain-perfumes"
     ],
-    "archivo": "al-haramain.png"
+    "archivo": "al-haramain.png",
+    "v": "22246bb7"
   },
   {
     "marca": "Ariana Grande",
     "claves": [
       "ariana-grande"
     ],
-    "archivo": "ariana-grande.png"
+    "archivo": "ariana-grande.png",
+    "v": "d430a754"
   },
   {
     "marca": "Armaf",
     "claves": [
       "armaf"
     ],
-    "archivo": "armaf.png"
+    "archivo": "armaf.png",
+    "v": "21fc9c71"
   },
   {
     "marca": "Azzaro",
     "claves": [
       "azzaro"
     ],
-    "archivo": "azzaro.png"
+    "archivo": "azzaro.png",
+    "v": "a56c266b"
   },
   {
     "marca": "Carolina Herrera",
@@ -42,7 +47,8 @@
       "carolina-herrera",
       "ch"
     ],
-    "archivo": "carolina-herrera.png"
+    "archivo": "carolina-herrera.png",
+    "v": "a853c94a"
   },
   {
     "marca": "Dior",
@@ -50,7 +56,8 @@
       "dior",
       "christian-dior"
     ],
-    "archivo": "dior.png"
+    "archivo": "dior.png",
+    "v": "837d0781"
   },
   {
     "marca": "Dolce & Gabbana",
@@ -59,21 +66,24 @@
       "dolcegabbana",
       "dg"
     ],
-    "archivo": "dolce-gabbana.png"
+    "archivo": "dolce-gabbana.png",
+    "v": "e63dd2f5"
   },
   {
     "marca": "Emper",
     "claves": [
       "emper"
     ],
-    "archivo": "emper.png"
+    "archivo": "emper.png",
+    "v": "213c79ff"
   },
   {
     "marca": "Fragrance One",
     "claves": [
       "fragrance-one"
     ],
-    "archivo": "fragrance-one.png"
+    "archivo": "fragrance-one.png",
+    "v": "64a017b1"
   },
   {
     "marca": "Giorgio Armani",
@@ -81,7 +91,8 @@
       "giorgio-armani",
       "armani"
     ],
-    "archivo": "giorgio-armani.png"
+    "archivo": "giorgio-armani.png",
+    "v": "7901b27b"
   },
   {
     "marca": "Jean Paul Gaultier",
@@ -90,14 +101,16 @@
       "jpg",
       "gaultier"
     ],
-    "archivo": "jean-paul-gaultier.png"
+    "archivo": "jean-paul-gaultier.png",
+    "v": "7161b93b"
   },
   {
     "marca": "Lancôme",
     "claves": [
       "lancome"
     ],
-    "archivo": "lancome.png"
+    "archivo": "lancome.png",
+    "v": "27ec404c"
   },
   {
     "marca": "Lattafa",
@@ -106,28 +119,32 @@
       "lattafa-perfumes",
       "rave"
     ],
-    "archivo": "lattafa.png"
+    "archivo": "lattafa.png",
+    "v": "4dd0d005"
   },
   {
     "marca": "Maison Alhambra",
     "claves": [
       "maison-alhambra"
     ],
-    "archivo": "maison-alhambra.png"
+    "archivo": "maison-alhambra.png",
+    "v": "9389136f"
   },
   {
     "marca": "Nautica",
     "claves": [
       "nautica"
     ],
-    "archivo": "nautica.png"
+    "archivo": "nautica.png",
+    "v": "f0bf8ba5"
   },
   {
     "marca": "Prada",
     "claves": [
       "prada"
     ],
-    "archivo": "prada.png"
+    "archivo": "prada.png",
+    "v": "24c510e1"
   },
   {
     "marca": "Rabanne",
@@ -135,35 +152,40 @@
       "rabanne",
       "paco-rabanne"
     ],
-    "archivo": "rabanne.png"
+    "archivo": "rabanne.png",
+    "v": "20aa4095"
   },
   {
     "marca": "Rasasi",
     "claves": [
       "rasasi"
     ],
-    "archivo": "rasasi.png"
+    "archivo": "rasasi.png",
+    "v": "0985fb2e"
   },
   {
     "marca": "Rayhaan",
     "claves": [
       "rayhaan"
     ],
-    "archivo": "rayhaan.png"
+    "archivo": "rayhaan.png",
+    "v": "91a18215"
   },
   {
     "marca": "Valentino",
     "claves": [
       "valentino"
     ],
-    "archivo": "valentino.png"
+    "archivo": "valentino.png",
+    "v": "4f7454cf"
   },
   {
     "marca": "Versace",
     "claves": [
       "versace"
     ],
-    "archivo": "versace.png"
+    "archivo": "versace.png",
+    "v": "ca483f8a"
   },
   {
     "marca": "Yves Saint Laurent",
@@ -172,6 +194,7 @@
       "ysl",
       "saint-laurent"
     ],
-    "archivo": "yves-saint-laurent.png"
+    "archivo": "yves-saint-laurent.png",
+    "v": "cbdd2a48"
   }
 ]
