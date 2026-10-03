@@ -1,0 +1,140 @@
+[
+  {
+    "marca": "Afnan",
+    "claves": [
+      "afnan",
+      "afnan-perfumes"
+    ],
+    "archivo": "afnan.png"
+  },
+  {
+    "marca": "Al Haramain",
+    "claves": [
+      "al-haramain",
+      "al-haramain-perfumes"
+    ],
+    "archivo": "al-haramain.png"
+  },
+  {
+    "marca": "Ariana Grande",
+    "claves": [
+      "ariana-grande"
+    ],
+    "archivo": "ariana-grande.png"
+  },
+  {
+    "marca": "Armaf",
+    "claves": [
+      "armaf"
+    ],
+    "archivo": "armaf.png"
+  },
+  {
+    "marca": "Azzaro",
+    "claves": [
+      "azzaro"
+    ],
+    "archivo": "azzaro.png"
+  },
+  {
+    "marca": "Carolina Herrera",
+    "claves": [
+      "carolina-herrera",
+      "ch"
+    ],
+    "archivo": "carolina-herrera.png"
+  },
+  {
+    "marca": "Dior",
+    "claves": [
+      "dior",
+      "christian-dior"
+    ],
+    "archivo": "dior.png"
+  },
+  {
+    "marca": "Dolce & Gabbana",
+    "claves": [
+      "dolce-gabbana",
+      "dolcegabbana",
+      "dg"
+    ],
+    "archivo": "dolce-gabbana.png"
+  },
+  {
+    "marca": "Emper",
+    "claves": [
+      "emper"
+    ],
+    "archivo": "emper.png"
+  },
+  {
+    "marca": "Fragrance One",
+    "claves": [
+      "fragrance-one"
+    ],
+    "archivo": "fragrance-one.png"
+  },
+  {
+    "marca": "Giorgio Armani",
+    "claves": [
+      "giorgio-armani",
+      "armani"
+    ],
+    "archivo": "giorgio-armani.png"
+  },
+  {
+    "marca": "Jean Paul Gaultier",
+    "claves": [
+      "jean-paul-gaultier",
+      "jpg",
+      "gaultier"
+    ],
+    "archivo": "jean-paul-gaultier.png"
+  },
+  {
+    "marca": "Lattafa",
+    "claves": [
+      "lattafa",
+      "lattafa-perfumes",
+      "rave"
+    ],
+    "archivo": "lattafa.png"
+  },
+  {
+    "marca": "Maison Alhambra",
+    "claves": [
+      "maison-alhambra"
+    ],
+    "archivo": "maison-alhambra.png"
+  },
+  {
+    "marca": "Prada",
+    "claves": [
+      "prada"
+    ],
+    "archivo": "prada.png"
+  },
+  {
+    "marca": "Rabanne",
+    "claves": [
+      "rabanne",
+      "paco-rabanne"
+    ],
+    "archivo": "rabanne.png"
+  },
+  {
+    "marca": "Rasasi",
+    "claves": [
+      "rasasi"
+    ],
+    "archivo": "rasasi.png"
+  },
+  {
+    "marca": "Rayhaan",
+    "claves": [
+      "rayhaan"
+    ],
+    "archivo": "rayhaan.png"
+  }
+]
