@@ -1,9 +1,10 @@
 import catalogoInicial from "./datos/catalogo-inicial.json";
+import { PREFIJO } from "./entorno";
 import type { Ajustes, Perfume, Resolucion } from "./tipos";
 
 const CLAVES = {
-  perfumes: "etq.perfumes",
-  ajustes: "etq.ajustes",
+  perfumes: `${PREFIJO}perfumes`,
+  ajustes: `${PREFIJO}ajustes`,
 };
 
 /** Resoluciones que se pueden elegir a mano (al conectar se usa la que informa la impresora). */
@@ -57,7 +58,7 @@ export function catalogoPorDefecto(): Perfume[] {
 
 // Versiones anteriores guardaban inventario e historial de impresiones.
 try {
-  localStorage.removeItem("etq.historial");
+  localStorage.removeItem(`${PREFIJO}historial`);
 } catch {
   /* sin almacenamiento */
 }

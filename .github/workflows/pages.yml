@@ -1,4 +1,8 @@
-# Publica la app en GitHub Pages en cada push a develop (pruebas) o master (estable).
+# Publica en GitHub Pages las dos versiones juntas:
+#   /            → master  (estable: es el link que se comparte)
+#   /dev/        → develop (pruebas)
+# Se ejecuta con cualquier push a master o develop y siempre compila ambas ramas,
+# así una publicación nunca borra a la otra.
 name: Publicar en GitHub Pages
 
 on:
@@ -19,17 +23,40 @@ jobs:
   construir:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v5
+        with:
+          ref: master
+          path: prod
+      - uses: actions/checkout@v5
+        with:
+          ref: develop
+          path: dev
+      - uses: actions/setup-node@v5
         with:
           node-version: 24
           cache: npm
-      - run: npm ci
-      - run: npm run build
+          cache-dependency-path: |
+            prod/package-lock.json
+            dev/package-lock.json
+      - name: Compilar master
+        working-directory: prod
+        run: npm ci && npm run build
+      - name: Compilar develop
+        working-directory: dev
+        env:
+          VITE_CANAL: dev
+        run: npm ci && npm run build
+      - name: Armar el sitio
+        run: |
+          mkdir -p sitio/dev
+          cp -r prod/dist/. sitio/
+          cp -r dev/dist/. sitio/dev/
+          # La versión de pruebas se instala como otra app, con otro nombre.
+          sed -i 's/"name": "Etiquetadora de Decants"/"name": "Etiquetadora de Decants (pruebas)"/; s/"short_name": "Decants"/"short_name": "Decants dev"/' sitio/dev/manifest.webmanifest
       - uses: actions/configure-pages@v5
-      - uses: actions/upload-pages-artifact@v3
+      - uses: actions/upload-pages-artifact@v4
         with:
-          path: dist
+          path: sitio
 
   publicar:
     needs: construir

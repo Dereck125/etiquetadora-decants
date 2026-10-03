@@ -14,6 +14,7 @@ import {
   reemplazarPerfumes,
 } from "./almacen";
 import { descargarTexto, perfumesACsv, perfumesDesdeCsv } from "./csv";
+import { CANAL, PREFIJO } from "./entorno";
 import { esCorta, lienzoImpresion, renderizarEtiqueta } from "./etiqueta";
 import {
   impresora,
@@ -193,7 +194,7 @@ function irA(v: Vista): void {
   vistaActual = v;
   $$("[data-vista]").forEach((b) => b.classList.toggle("activa", b.dataset.vista === v));
   vistas[v]();
-  try { sessionStorage.setItem("etq.vista", v); } catch { /* sin almacenamiento */ }
+  try { sessionStorage.setItem(`${PREFIJO}vista`, v); } catch { /* sin almacenamiento */ }
 }
 $$("[data-vista]").forEach((b) => b.addEventListener("click", () => irA(b.dataset.vista as Vista)));
 
@@ -805,10 +806,15 @@ function vistaAjustes(): void {
 // ---------- arranque ----------
 
 async function iniciar(): Promise<void> {
+  if (CANAL === "dev") {
+    document.body.classList.add("canal-dev");
+    document.title += " (pruebas)";
+    $(".barra h1").insertAdjacentHTML("beforeend", ` <span class="insignia-dev">Pruebas</span>`);
+  }
   await cargarLogosIncluidos();
   let inicial: Vista = "catalogo";
   try {
-    const v = sessionStorage.getItem("etq.vista") as Vista | null;
+    const v = sessionStorage.getItem(`${PREFIJO}vista`) as Vista | null;
     if (v && v in vistas) inicial = v;
   } catch { /* sin almacenamiento */ }
   irA(inicial);
