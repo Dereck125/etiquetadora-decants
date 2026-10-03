@@ -17,6 +17,8 @@ interface EntradaIndice {
   marca: string;
   claves: string[];
   archivo: string;
+  /** Huella del contenido: cambia cuando cambia la imagen. */
+  v?: string;
 }
 
 const RUTA_MARCAS = "logos/marcas/";
@@ -27,9 +29,14 @@ let incluidos = new Map<string, string>();
 /** Carga el índice de logos incluidos en la app (public/logos/marcas/index.json). */
 export async function cargarLogosIncluidos(): Promise<void> {
   try {
-    const r = await fetch(RUTA_MARCAS + "index.json");
+    // GitHub Pages cachea 10 min: se pide siempre fresca para ver logos nuevos al abrir la app.
+    const r = await fetch(RUTA_MARCAS + "index.json", { cache: "no-cache" });
     const indice = (await r.json()) as EntradaIndice[];
-    incluidos = new Map(indice.flatMap((e) => e.claves.map((c) => [c, RUTA_MARCAS + e.archivo] as const)));
+    incluidos = new Map(
+      indice.flatMap((e) =>
+        e.claves.map((c) => [c, `${RUTA_MARCAS}${e.archivo}${e.v ? `?v=${e.v}` : ""}`] as const),
+      ),
+    );
   } catch {
     incluidos = new Map();
   }

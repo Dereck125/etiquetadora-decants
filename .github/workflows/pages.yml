@@ -15,9 +15,11 @@ permissions:
   pages: write
   id-token: write
 
+# En cola, sin cancelar: cada publicación compila ambas ramas, así que la última siempre queda bien
+# (cancelar la anterior la marcaba como "Cancelled" en el Pull Request, aunque no era un error).
 concurrency:
   group: pages
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
   construir:

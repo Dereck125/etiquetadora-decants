@@ -7,6 +7,7 @@
 //
 // Para agregar un logo a mano: guarda el archivo como tools/logos/originales/<slug>.(png|jpg|svg|webp)
 // (p. ej. "yves-saint-laurent.svg"), verifica que la marca exista en fuentes.json y corre con --local.
+import { createHash } from "node:crypto";
 import fs from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -135,6 +136,10 @@ for (const f of fuentes) {
     if (existe) indice.push({ marca: f.marca, claves: [...new Set([f.marca, ...f.alias].map(slug))], archivo: `${s}.png` });
     console.log(existe ? "previo" : "FALLO", f.marca, "-", e.message);
   }
+}
+// Huella de cada PNG: la app la agrega a la URL (?v=…) para que el teléfono no use una imagen vieja en caché.
+for (const e of indice) {
+  e.v = createHash("sha1").update(await fs.readFile(path.join(SALIDA, e.archivo))).digest("hex").slice(0, 8);
 }
 await fs.writeFile(path.join(SALIDA, "index.json"), JSON.stringify(indice, null, 2) + "\n");
 console.log(`\n${indice.length}/${fuentes.length} logos en ${path.relative(process.cwd(), SALIDA)}`);
