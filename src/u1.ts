@@ -68,7 +68,7 @@ export const OPCIONES_U1_DEFECTO: OpcionesU1 = {
 };
 
 /** Versión de los valores calibrados por defecto: al subirla se reemplazan los guardados. */
-export const CALIBRACION_U1_VERSION = 3;
+export const CALIBRACION_U1_VERSION = 4;
 
 // ---------- paquetes ----------
 
@@ -227,6 +227,8 @@ function guardarAdelantada(v: boolean): void {
 
 class ImpresoraU1 {
   private dispositivo?: BluetoothDevice;
+  /** Se llama al conectar o desconectar (para mostrar el estado en la barra). */
+  alCambiarEstado?: (conectada: boolean) => void;
   private escritura?: BluetoothRemoteGATTCharacteristic;
   private pausada = false;
   /** Últimos avisos recibidos (hex), para diagnóstico. */
@@ -247,7 +249,10 @@ class ImpresoraU1 {
       filters: [{ namePrefix: "U1" }, { services: [SERVICIO] }],
       optionalServices: [SERVICIO],
     });
-    this.dispositivo.addEventListener("gattserverdisconnected", () => (this.escritura = undefined));
+    this.dispositivo.addEventListener("gattserverdisconnected", () => {
+      this.escritura = undefined;
+      this.alCambiarEstado?.(false);
+    });
     const gatt = await this.dispositivo.gatt!.connect();
     const servicio = await gatt.getPrimaryService(SERVICIO);
     this.escritura = await servicio.getCharacteristic(ESCRITURA);
@@ -262,6 +267,7 @@ class ImpresoraU1 {
       this.alAviso?.(texto);
     });
     await avisos.startNotifications();
+    this.alCambiarEstado?.(true);
   }
 
   async desconectar(): Promise<void> {

@@ -46,6 +46,8 @@ export interface Ajustes {
   volumenes: number[];
   /** Volúmenes cuyo frasco solo cubre media etiqueta: se imprime en la mitad superior. */
   volumenesCortos: number[];
+  /** Volúmenes que van a la impresora grande (U1, etiqueta horizontal 40 × 20). */
+  volumenesGrandes: number[];
   /** Largo impreso en mm (la etiqueta mide 40). Por debajo de 40 para no invadir la etiqueta siguiente. */
   largoMm: number;
   /** Espacio en blanco arriba del diseño, en mm, para centrarlo en la etiqueta. */

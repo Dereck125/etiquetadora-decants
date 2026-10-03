@@ -7,6 +7,11 @@ Funciona en **Chrome para Android** y **Chrome/Edge en PC**. Safari/iPhone no so
 
 ## Funciones
 
+- **Dos impresoras**: en el catálogo se elige **Etiquetas chicas** (3, 5 y 10 ml → Niimbot D11, etiqueta vertical
+  12 × 40) o **Etiquetas grandes** (30 ml → Yihetangde U1, etiqueta horizontal 40 × 20 con logo de la tienda,
+  nombre, marca y volumen). La barra muestra el estado de ambas (Chica / Grande). La U1 se calibra en
+  Ajustes → Impresora grande (centrado, margen arriba, avance para arrancar).
+
 - **Catálogo**: búsqueda, filtro por marca y por género (Dama / Caballero / Unisex).
 - **Impresión**: elige volumen y cantidad, vista previa exacta (1 px = 1 punto de la impresora).
 - **Etiqueta rápida**: imprime sin guardar en el catálogo.

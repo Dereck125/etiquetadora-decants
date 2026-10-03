@@ -96,6 +96,46 @@ function leerArchivo(acepta: string): Promise<File | null> {
   });
 }
 
+// ---------- dos impresoras ----------
+
+/** Chica = Niimbot D11 (etiqueta vertical 12 × 40). Grande = Yihetangde U1 (horizontal 40 × 20). */
+type Modo = "chica" | "grande";
+
+function esGrande(volumen: string): boolean {
+  return estado.ajustes.volumenesGrandes.map(String).includes(volumen.trim());
+}
+
+function volumenesDe(modo: Modo): string[] {
+  const grandes = estado.ajustes.volumenesGrandes.map(String);
+  const todos = [...new Set([...estado.ajustes.volumenes.map(String), ...grandes])];
+  return modo === "grande" ? grandes : todos.filter((v) => !grandes.includes(v));
+}
+
+let modo: Modo = "chica";
+try {
+  if (localStorage.getItem(`${PREFIJO}modo`) === "grande") modo = "grande";
+} catch {
+  /* sin almacenamiento */
+}
+function elegirModo(m: Modo): void {
+  modo = m;
+  try {
+    localStorage.setItem(`${PREFIJO}modo`, m);
+  } catch {
+    /* sin almacenamiento */
+  }
+}
+
+/** Etiqueta de la impresora grande: diseño horizontal + su ubicación en los 384 puntos del cabezal. */
+async function etiquetaGrande(datos: DatosEtiqueta): Promise<{ etiqueta: HTMLCanvasElement; lienzo: HTMLCanvasElement }> {
+  const o = estado.ajustes.u1;
+  const area = areaImprimibleU1(o.anchoMm, o.desplazamiento);
+  // El margen de arriba se resta del alto: la imagen total sigue midiendo lo mismo que la etiqueta.
+  const margen = Math.round(Math.max(0, o.margenArribaMm) * 8);
+  const etiqueta = await renderizarEtiquetaHorizontal(datos, estado.ajustes, area.ancho, Math.round(o.altoMm * 8) - margen);
+  return { etiqueta, lienzo: lienzoEtiquetaU1(etiqueta, area.x, margen) };
+}
+
 /** Dibuja la etiqueta en un canvas visible (vista previa). Evita carreras entre renders. */
 const versionesPrevia = new WeakMap<HTMLCanvasElement, number>();
 async function pintarVistaPrevia(
@@ -105,8 +145,12 @@ async function pintarVistaPrevia(
 ): Promise<HTMLCanvasElement> {
   const v = (versionesPrevia.get(destino) ?? 0) + 1;
   versionesPrevia.set(destino, v);
-  const etiqueta = await renderizarEtiqueta(datos, estado.ajustes, pareja);
+  const grande = esGrande(datos.volumen);
+  const etiqueta = grande ? (await etiquetaGrande(datos)).etiqueta : await renderizarEtiqueta(datos, estado.ajustes, pareja);
   if (versionesPrevia.get(destino) === v) {
+    destino.parentElement?.classList.toggle("horizontal", grande);
+    const pie = destino.closest("figure")?.querySelector("figcaption");
+    if (pie) pie.textContent = grande ? "40 × 20 mm · impresora grande" : "12 × 40 mm · impresora chica";
     destino.width = etiqueta.width;
     destino.height = etiqueta.height;
     destino.getContext("2d")!.drawImage(etiqueta, 0, 0);
@@ -115,7 +159,9 @@ async function pintarVistaPrevia(
 }
 
 async function descargarPng(datos: DatosEtiqueta, pareja?: DatosEtiqueta | null): Promise<void> {
-  const etiqueta = await renderizarEtiqueta(datos, estado.ajustes, pareja);
+  const etiqueta = esGrande(datos.volumen)
+    ? (await etiquetaGrande(datos)).etiqueta
+    : await renderizarEtiqueta(datos, estado.ajustes, pareja);
   const a = document.createElement("a");
   a.href = etiqueta.toDataURL("image/png");
   a.download = `etiqueta-${slugMarca(datos.nombre) || "decant"}-${slugMarca(datos.volumen)}.png`;
@@ -127,11 +173,32 @@ async function descargarPng(datos: DatosEtiqueta, pareja?: DatosEtiqueta | null)
 const btnImpresora = $("#btn-impresora");
 impresora.alCambiar((est, detalle) => {
   btnImpresora.dataset.estado = est;
+  btnImpresora.title = `Impresora chica (3, 5 y 10 ml)${detalle ? ` · ${detalle}` : ""}`;
   $("#txt-impresora").textContent =
-    est === "conectada" ? detalle || "Conectada"
-    : est === "conectando" ? "Conectando…"
-    : est === "imprimiendo" ? "Imprimiendo…"
-    : "Conectar impresora";
+    est === "conectando" ? "Chica…" : est === "imprimiendo" ? "Imprimiendo…" : "Chica";
+});
+
+const btnImpresoraU1 = $("#btn-impresora-u1");
+const estadoU1 = (conectada: boolean, texto = "Grande") => {
+  btnImpresoraU1.dataset.estado = conectada ? "conectada" : "desconectada";
+  $("#txt-impresora-u1").textContent = texto;
+};
+u1.alCambiarEstado = (conectada) => estadoU1(conectada);
+btnImpresoraU1.addEventListener("click", async () => {
+  try {
+    if (u1.conectada) {
+      if (confirm("¿Desconectar la impresora grande?")) await u1.desconectar();
+      estadoU1(u1.conectada);
+    } else {
+      btnImpresoraU1.dataset.estado = "conectando";
+      $("#txt-impresora-u1").textContent = "Grande…";
+      await u1.conectar();
+      aviso("Impresora grande conectada");
+    }
+  } catch (e) {
+    estadoU1(u1.conectada);
+    aviso(mensajeError(e), "error");
+  }
 });
 /**
  * Usa la resolución que informa la impresora conectada (D11: 203 DPI, D11-H: 300 DPI…),
@@ -168,6 +235,7 @@ async function imprimir(
   progreso?: (t: string) => void,
   pareja?: DatosEtiqueta | null,
 ): Promise<boolean> {
+  if (esGrande(datos.volumen)) return imprimirGrande(datos, cantidad, progreso);
   let tiempos: TiemposImpresion;
   try {
     // Conectar primero: Chrome solo abre el selector Bluetooth justo después de un toque.
@@ -195,6 +263,24 @@ async function imprimir(
   const de = pareja ? `${datos.nombre} + ${pareja.nombre} (2 en 1)` : datos.nombre;
   const s = (ms: number) => (ms / 1000).toLocaleString("es", { maximumFractionDigits: 1 });
   aviso(`Listo: ${cantidad} etiqueta${cantidad === 1 ? "" : "s"} de ${de} · ${s(tiempos.total)} s (envío ${s(tiempos.envio)} s)`);
+  return true;
+}
+
+/** Impresión en la impresora grande (U1). */
+async function imprimirGrande(datos: DatosEtiqueta, cantidad: number, progreso?: (t: string) => void): Promise<boolean> {
+  const inicio = performance.now();
+  try {
+    const { lienzo } = await etiquetaGrande(datos);
+    btnImpresoraU1.dataset.estado = "imprimiendo";
+    await u1.imprimir(lienzo, cantidad, estado.ajustes.u1, progreso);
+  } catch (e) {
+    aviso("No se pudo imprimir en la impresora grande: " + mensajeError(e), "error");
+    return false;
+  } finally {
+    estadoU1(u1.conectada);
+  }
+  const s = ((performance.now() - inicio) / 1000).toLocaleString("es", { maximumFractionDigits: 1 });
+  aviso(`Listo: ${cantidad} etiqueta${cantidad === 1 ? "" : "s"} grande${cantidad === 1 ? "" : "s"} de ${datos.nombre} · ${s} s`);
   return true;
 }
 
@@ -238,7 +324,16 @@ function perfumesFiltrados(): Perfume[] {
 
 function vistaCatalogo(): void {
   const marcas = marcasDelCatalogo();
+  const textoVolumenes = (m: Modo) => volumenesDe(m).join(" · ") + " ml";
   $("#vista").innerHTML = `
+    <section class="modos" aria-label="¿Qué etiqueta vas a imprimir?">
+      <button type="button" class="modo ${modo === "chica" ? "activa" : ""}" data-modo="chica">
+        <b>Etiquetas chicas</b><span>${esc(textoVolumenes("chica"))}</span>
+      </button>
+      <button type="button" class="modo ${modo === "grande" ? "activa" : ""}" data-modo="grande">
+        <b>Etiquetas grandes</b><span>${esc(textoVolumenes("grande"))}</span>
+      </button>
+    </section>
     <section class="filtros">
       <input type="search" id="f-buscar" placeholder="Buscar perfume, marca o nota…" value="${esc(filtro.texto)}" />
       <select id="f-marca">
@@ -290,6 +385,12 @@ function vistaCatalogo(): void {
       pintarLista();
     }),
   );
+  $$(".modo").forEach((b) =>
+    b.addEventListener("click", () => {
+      elegirModo(b.dataset.modo as Modo);
+      $$(".modo").forEach((x) => x.classList.toggle("activa", x === b));
+    }),
+  );
   $("#btn-nuevo").addEventListener("click", () => abrirEditor(null));
   $("#lista").addEventListener("click", (e) => {
     const fila = (e.target as HTMLElement).closest<HTMLElement>(".fila");
@@ -327,8 +428,9 @@ function opcionesPerfumes(): string {
 
 function abrirImpresion(p: Perfume): void {
   const dlg = $<HTMLDialogElement>("#dlg-imprimir");
-  const vols = estado.ajustes.volumenes.map(String);
+  const vols = volumenesDe(modo);
   let volumen = vols.includes(ultimoVolumen) ? ultimoVolumen : (vols[0] ?? "5");
+  const nombreImpresora = modo === "grande" ? "impresora grande" : "impresora chica";
 
   dlg.innerHTML = `
     <form method="dialog" class="dialogo-contenido">
@@ -339,7 +441,7 @@ function abrirImpresion(p: Perfume): void {
       <div class="imprimir-cuerpo">
         <figure class="vista-previa"><div class="papel"><canvas id="i-previa"></canvas></div><figcaption>12 × 40 mm</figcaption></figure>
         <div class="controles">
-          <label class="etiqueta-campo">Volumen</label>
+          <label class="etiqueta-campo">Volumen <small>(${nombreImpresora})</small></label>
           <div class="segmentado volumenes" id="i-vol">
             ${vols.map((v) => `<button type="button" data-v="${v}">${v} ml</button>`).join("")}
           </div>
@@ -359,7 +461,7 @@ function abrirImpresion(p: Perfume): void {
             <input id="i-cant" type="number" min="1" max="99" value="1" inputmode="numeric" />
             <button type="button" data-paso="1" aria-label="Más">+</button>
           </div>
-          <button type="button" class="btn primario grande" id="i-imprimir">Imprimir</button>
+          <button type="button" class="btn primario grande" id="i-imprimir">Imprimir en la ${nombreImpresora}</button>
           <p class="progreso" id="i-progreso"></p>
           <div class="acciones-sec">
             <button type="button" class="btn" id="i-editar">Editar perfume</button>
@@ -542,8 +644,8 @@ function seccionU1(): string {
     fijo: "Fijo (mm)",
     timini: "Como TiMini (12 mm)",
   };
-  return `<section class="tarjeta formulario" id="sec-u1">
-      <h2>Impresora U1 <small>(pruebas)</small></h2>
+  return `<details class="tarjeta formulario" id="sec-u1">
+      <summary><h2>Impresora grande (U1) <small>· calibración y pruebas</small></h2></summary>
       <p class="ayuda">Imprime una etiqueta de calibración: un marco justo en el borde de la etiqueta y una flecha
         "ARRIBA". Sirve para ajustar el centrado y cómo avanza hasta la siguiente etiqueta.</p>
       <div class="acciones-sec envolver">
@@ -631,7 +733,7 @@ function seccionU1(): string {
       </details>
       <figure class="vista-previa"><canvas id="u1-previa" class="u1-previa"></canvas><figcaption>Vista previa (384 puntos de ancho)</figcaption></figure>
       <pre class="diag-salida" id="u1-avisos">${esc(u1.avisos.join("\n") || "Avisos de la impresora: —")}</pre>
-    </section>`;
+    </details>`;
 }
 
 function enlazarU1(): void {
@@ -715,16 +817,7 @@ function enlazarU1(): void {
   const lienzoEtiqueta30 = async () => {
     const p = estado.perfumes.find((x) => x.id === ($("#e30-perfume") as HTMLSelectElement).value) ?? estado.perfumes[0];
     const volumen = ($("#e30-vol") as HTMLInputElement).value.trim() || "30";
-    const area = areaImprimibleU1(o.anchoMm, o.desplazamiento);
-    // El margen de arriba se resta del alto: la imagen total sigue midiendo lo mismo que la etiqueta.
-    const margen = Math.round(Math.max(0, o.margenArribaMm) * 8);
-    const etiqueta = await renderizarEtiquetaHorizontal(
-      { nombre: p?.nombre ?? "Perfume", marca: p?.marca ?? "", volumen },
-      estado.ajustes,
-      area.ancho,
-      Math.round(o.altoMm * 8) - margen,
-    );
-    return lienzoEtiquetaU1(etiqueta, area.x, margen);
+    return (await etiquetaGrande({ nombre: p?.nombre ?? "Perfume", marca: p?.marca ?? "", volumen })).lienzo;
   };
   const previa30 = async () => {
     const c = await lienzoEtiqueta30();
@@ -906,7 +999,7 @@ function vistaAjustes(): void {
         : ""
     }
 
-    ${CANAL === "dev" ? seccionU1() : ""}
+    ${seccionU1()}
 
     <section class="tarjeta">
       <h2>Logo de la tienda</h2>
@@ -969,7 +1062,7 @@ function vistaAjustes(): void {
     guardarAjustes();
     repintar();
   });
-  if (CANAL === "dev") enlazarU1();
+  enlazarU1();
   const salidaDiag = document.getElementById("diag-salida");
   const diagnosticar = async (fn: () => Promise<string>) => {
     if (!salidaDiag) return;
