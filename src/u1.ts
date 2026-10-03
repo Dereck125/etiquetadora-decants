@@ -335,15 +335,16 @@ export function areaImprimibleU1(anchoMm: number, desplazamiento: number) {
   return { x: izq, ancho: der - izq };
 }
 
-export function lienzoEtiquetaU1(etiqueta: HTMLCanvasElement, x: number): HTMLCanvasElement {
+/** Coloca la etiqueta en el cabezal: `x` en puntos y `margenArriba` filas en blanco antes del diseño. */
+export function lienzoEtiquetaU1(etiqueta: HTMLCanvasElement, x: number, margenArriba = 0): HTMLCanvasElement {
   const c = document.createElement("canvas");
   c.width = U1_ANCHO;
-  c.height = etiqueta.height;
+  c.height = etiqueta.height + margenArriba;
   const ctx = c.getContext("2d")!;
   ctx.fillStyle = "#fff";
   ctx.fillRect(0, 0, U1_ANCHO, c.height);
   ctx.imageSmoothingEnabled = false;
-  ctx.drawImage(etiqueta, x, 0);
+  ctx.drawImage(etiqueta, x, margenArriba);
   return c;
 }
 

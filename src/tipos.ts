@@ -8,6 +8,11 @@ export interface ConfigU1 extends OpcionesU1 {
   altoMm: number;
   /** Desplazamiento horizontal de la etiqueta respecto al centro del cabezal, en puntos. */
   desplazamiento: number;
+  /**
+   * Filas en blanco (mm) al inicio de la imagen: bajan el diseño dentro de la etiqueta. Hace falta porque
+   * la U1 se alinea sola con el sensor y no hace caso al retroceso (con inicio 0 o −2 salía igual).
+   */
+  margenArribaMm: number;
   /** Versión de la calibración por defecto con la que se guardó (ver CALIBRACION_U1_VERSION). */
   version?: number;
 }
