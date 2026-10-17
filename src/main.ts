@@ -11,6 +11,7 @@ import {
   guardarPerfumes,
   marcasDelCatalogo,
   nuevoId,
+  pedirAlmacenamientoPersistente,
   reemplazarPerfumes,
 } from "./almacen";
 import { descargarTexto, perfumesACsv, perfumesDesdeCsv } from "./csv";
@@ -561,21 +562,32 @@ function abrirImpresion(p: Perfume): void {
 
 // ---------- editor de perfume ----------
 
-function abrirEditor(p: Perfume | null): void {
+/** Abre el editor de un perfume; con `p` null crea uno nuevo, opcionalmente con datos ya llenados. */
+function abrirEditor(p: Perfume | null, borrador: Partial<Perfume> = {}): void {
   const dlg = $<HTMLDialogElement>("#dlg-perfume");
+  const base = p ?? borrador;
+  /** Logo elegido en este diálogo: se guarda junto con el perfume al tocar "Guardar". */
+  let logoNuevo: string | null = null;
   dlg.innerHTML = `
     <form class="dialogo-contenido formulario" id="form-perfume">
       <header class="dialogo-cabecera">
         <h2>${p ? "Editar perfume" : "Nuevo perfume"}</h2>
         <button type="button" class="cerrar" id="e-cerrar" aria-label="Cerrar">×</button>
       </header>
-      <label>Nombre<input name="nombre" required value="${esc(p?.nombre)}" autocomplete="off" /></label>
-      <label>Marca<input name="marca" list="lista-marcas" value="${esc(p?.marca)}" autocomplete="off" /></label>
+      <label>Nombre<input name="nombre" required value="${esc(base.nombre)}" autocomplete="off" /></label>
+      <label>Marca<input name="marca" list="lista-marcas" value="${esc(base.marca)}" autocomplete="off" placeholder="Elige una o escribe una nueva" /></label>
       <datalist id="lista-marcas">${marcasDelCatalogo().map((m) => `<option value="${esc(m)}">`).join("")}</datalist>
+      <div class="editor-logo">
+        <span class="logo-caja" id="e-logo"></span>
+        <div class="editor-logo-texto">
+          <small id="e-logo-estado"></small>
+          <button type="button" class="btn" id="e-logo-subir"></button>
+        </div>
+      </div>
       <label>Género
-        <select name="genero">${GENEROS.map((g) => `<option ${g === (p?.genero ?? "Unisex") ? "selected" : ""}>${g}</option>`).join("")}</select>
+        <select name="genero">${GENEROS.map((g) => `<option ${g === (base.genero ?? "Unisex") ? "selected" : ""}>${g}</option>`).join("")}</select>
       </label>
-      <label>Nota interna <small>(no se imprime)</small><input name="nota" value="${esc(p?.nota)}" /></label>
+      <label>Nota interna <small>(no se imprime)</small><input name="nota" value="${esc(base.nota)}" /></label>
       <footer class="dialogo-pie">
         ${p ? `<button type="button" class="btn peligro" id="e-borrar">Eliminar</button>` : "<span></span>"}
         <button type="submit" class="btn primario">Guardar</button>
@@ -583,6 +595,35 @@ function abrirEditor(p: Perfume | null): void {
     </form>`;
 
   const form = $<HTMLFormElement>("#form-perfume", dlg);
+  const campoMarca = $<HTMLInputElement>('[name="marca"]', form);
+  // Vista previa del logo de la marca escrita: el recién subido, el guardado o el incluido en la app.
+  const pintarLogo = () => {
+    const marca = campoMarca.value.trim();
+    const url = logoNuevo ?? urlLogoMarca(marca);
+    $("#e-logo", dlg).innerHTML = url ? `<img src="${esc(url)}" alt="" />` : `<span class="sin-logo">Sin logo</span>`;
+    $("#e-logo-estado", dlg).textContent = !marca
+      ? "Escribe la marca para ver o subir su logo."
+      : logoNuevo
+        ? "Logo nuevo: se guarda al tocar Guardar."
+        : url
+          ? `Logo de ${marca}`
+          : "Sin logo: se imprime el nombre de la marca en texto.";
+    const btn = $<HTMLButtonElement>("#e-logo-subir", dlg);
+    btn.textContent = url ? "Cambiar logo" : "Subir logo";
+    btn.disabled = !marca;
+  };
+  pintarLogo();
+  campoMarca.addEventListener("input", pintarLogo);
+  $("#e-logo-subir", dlg).addEventListener("click", async () => {
+    const archivo = await leerArchivo("image/*");
+    if (!archivo) return;
+    try {
+      logoNuevo = await procesarLogoSubido(archivo);
+      pintarLogo();
+    } catch (e) {
+      aviso(mensajeError(e), "error");
+    }
+  });
   $("#e-cerrar", dlg).addEventListener("click", () => dlg.close());
   form.addEventListener("submit", (e) => {
     e.preventDefault();
@@ -596,8 +637,12 @@ function abrirEditor(p: Perfume | null): void {
     if (p) Object.assign(p, datos);
     else estado.perfumes.push({ id: nuevoId(), activo: true, ...datos });
     guardarPerfumes();
+    if (logoNuevo && slugMarca(datos.marca)) {
+      estado.ajustes.logosMarca[slugMarca(datos.marca)] = logoNuevo;
+      guardarAjustes();
+    }
     dlg.close();
-    aviso("Perfume guardado");
+    aviso(logoNuevo ? "Perfume y logo guardados" : "Perfume guardado");
     vistas[vistaActual]();
   });
   $("#e-borrar", dlg)?.addEventListener("click", () => {
@@ -624,7 +669,7 @@ function vistaRapida(): void {
   $("#vista").innerHTML = `
     <section class="tarjeta rapida">
       <form class="formulario" id="form-rapida">
-        <p class="ayuda">Imprime una etiqueta sin guardarla en el catálogo.</p>
+        <p class="ayuda">Imprime una etiqueta sin guardarla en el catálogo (si te gusta, tócale "Guardar en el catálogo").</p>
         <label>Nombre del perfume<input name="nombre" value="${esc(rapida.nombre)}" placeholder="Ej. Khamrah" autocomplete="off" /></label>
         <label>Marca
           <select id="r-marca">
@@ -643,7 +688,10 @@ function vistaRapida(): void {
         <label>Cantidad<input name="cantidad" type="number" min="1" max="99" value="${rapida.cantidad}" inputmode="numeric" /></label>
         <button type="submit" class="btn primario grande" id="r-imprimir">Imprimir</button>
         <p class="progreso" id="r-progreso"></p>
-        <button type="button" class="btn" id="r-png">Descargar PNG</button>
+        <div class="acciones-sec envolver">
+          <button type="button" class="btn" id="r-guardar">Guardar en el catálogo</button>
+          <button type="button" class="btn" id="r-png">Descargar PNG</button>
+        </div>
       </form>
       <figure class="vista-previa"><div class="papel"><canvas id="r-previa"></canvas></div><figcaption>12 × 40 mm</figcaption></figure>
     </section>`;
@@ -681,6 +729,10 @@ function vistaRapida(): void {
     }),
   );
   $("#r-png").addEventListener("click", () => void descargarPng(rapida));
+  $("#r-guardar").addEventListener("click", () => {
+    leer();
+    abrirEditor(null, { nombre: rapida.nombre.trim(), marca: rapida.marca });
+  });
   form.addEventListener("submit", async (e) => {
     e.preventDefault();
     leer();
@@ -1284,6 +1336,7 @@ async function iniciar(): Promise<void> {
     $(".barra h1").insertAdjacentHTML("beforeend", ` <span class="insignia-dev">Pruebas</span>`);
   }
   await cargarLogosIncluidos();
+  void pedirAlmacenamientoPersistente();
   let inicial: Vista = "catalogo";
   try {
     const v = sessionStorage.getItem(`${PREFIJO}vista`) as Vista | null;

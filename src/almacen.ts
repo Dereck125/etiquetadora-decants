@@ -100,6 +100,18 @@ export const estado = {
   ajustes: ajustesIniciales,
 };
 
+/**
+ * Pide al navegador que no borre los datos guardados (catálogo y logos) aunque le falte espacio.
+ * Chrome lo concede solo a las apps instaladas o muy usadas; si no, lo intenta de nuevo otro día.
+ */
+export async function pedirAlmacenamientoPersistente(): Promise<void> {
+  try {
+    if (navigator.storage?.persist && !(await navigator.storage.persisted())) await navigator.storage.persist();
+  } catch {
+    /* sin soporte */
+  }
+}
+
 export function guardarPerfumes(): void {
   escribir(CLAVES.perfumes, estado.perfumes);
 }

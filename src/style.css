@@ -235,6 +235,8 @@ input:focus-visible, select:focus-visible, button:focus-visible { outline: 2px s
 .sin-logo { font-size: 0.75rem; color: #8a8175; }
 .logos-marca { list-style: none; padding: 0; margin: 12px 0 0; display: grid; gap: 8px; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); }
 .logos-marca li { display: flex; align-items: center; gap: 10px; padding: 8px; border: 1px solid var(--borde); border-radius: 12px; }
+.editor-logo { display: flex; align-items: center; gap: 12px; }
+.editor-logo-texto { display: grid; gap: 6px; justify-items: start; color: var(--texto-2); }
 .nombre-marca { flex: 1; font-weight: 600; min-width: 0; overflow-wrap: anywhere; }
 
 /* ---------- aviso ---------- */
