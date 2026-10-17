@@ -14,12 +14,18 @@ Funciona en **Chrome para Android** y **Chrome/Edge en PC**. Safari/iPhone no so
 
 - **Catálogo**: búsqueda, filtro por marca y por género (Dama / Caballero / Unisex).
 - **Impresión**: elige volumen y cantidad, vista previa exacta (1 px = 1 punto de la impresora).
-- **Etiqueta rápida**: imprime sin guardar en el catálogo.
+- **Nuevo perfume**: en el catálogo, **+ Nuevo perfume** guarda nombre, marca (existente o nueva), género y el
+  **logo de la marca** en un solo paso. Al escribir la marca se ve su logo; si no tiene, se sube ahí mismo.
+- **Etiqueta rápida**: imprime sin guardar en el catálogo; **Guardar en el catálogo** abre el formulario de nuevo
+  perfume con el nombre y la marca ya llenos.
 - **Ajustes**: resolución, etiqueta corta, marco decorativo, girar 180°, densidad, logo de la tienda,
   logos de marca, respaldo JSON e importación/exportación CSV.
 
-El stock y las ventas se llevan fuera de esta app. El catálogo y los ajustes se guardan en el navegador
-del dispositivo (localStorage); descarga un respaldo JSON de vez en cuando.
+El stock y las ventas se llevan fuera de esta app. El catálogo, los ajustes y los logos subidos se guardan en el
+navegador del dispositivo (localStorage) y siguen ahí al cerrar la app o al publicar versiones nuevas. La app pide
+al navegador almacenamiento persistente para que no los borre por falta de espacio. Se pierden si se borran los
+datos del sitio en Chrome, así que descarga un respaldo JSON de vez en cuando (incluye perfumes y logos); con
+**Restaurar respaldo** se pasan también a otro teléfono.
 
 ## Desarrollo
 
